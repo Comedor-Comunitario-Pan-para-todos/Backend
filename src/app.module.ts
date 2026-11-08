@@ -6,6 +6,7 @@ import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { Rol } from './auth/entities/rol.entity.js';
 import { Usuario } from './auth/entities/usuario.entity.js';
+import { UsuariosModule } from './usuarios/usuarios.module.js';
 
 @Module({
   imports: [
@@ -31,6 +32,8 @@ import { Usuario } from './auth/entities/usuario.entity.js';
     }),
 
     AuthModule,
+
+    UsuariosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

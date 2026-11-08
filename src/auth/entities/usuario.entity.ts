@@ -1,6 +1,7 @@
 import {
     Column,
     CreateDateColumn,
+    DeleteDateColumn,
     Entity,
     ManyToOne,
     PrimaryGeneratedColumn,
@@ -19,7 +20,7 @@ export class Usuario {
     @Column({ select: false }) // 'select: false' evita que la contraseña viaje por accidente en las consultas
     password: string;
 
-    @Column()
+    @Column({ length: 255 })
     nombreCompleto: string;
 
     @Column({ default: true })
@@ -33,4 +34,7 @@ export class Usuario {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }
