@@ -33,7 +33,7 @@ import { QueryBeneficiariosDto } from './dto/query-beneficiarios.dto.js';
 @ApiResponse({ status: 403, description: 'Acceso denegado: rol no autorizado' })
 @Controller('beneficiarios')
 export class BeneficiariosController {
-  constructor(private readonly beneficiariosService: BeneficiariosService) { }
+  constructor(private readonly beneficiariosService: BeneficiariosService) {}
 
   @Post()
   @ApiOperation({ summary: 'Registrar un nuevo beneficiario (RF-01)' })
@@ -83,8 +83,10 @@ export class BeneficiariosController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Desactivar a un beneficiario (borrado lógico)' })
+  @Roles(RolEnum.COORDINADORA) // Exclusivo de Coordinadora para desactivar registros
+  @ApiOperation({ summary: 'Desactivar a un beneficiario (borrado lógico) - Exclusivo Coordinadora' })
   @ApiResponse({ status: 200, description: 'Beneficiario desactivado exitosamente' })
+  @ApiResponse({ status: 403, description: 'Acceso denegado: solo Coordinadora puede desactivar' })
   @ApiResponse({ status: 404, description: 'Beneficiario no encontrado' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.beneficiariosService.remove(id);
