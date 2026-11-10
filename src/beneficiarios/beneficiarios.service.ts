@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, QueryFailedError, Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Beneficiario } from './entities/beneficiario.entity.js';
 import { CreateBeneficiarioDto } from './dto/create-beneficiario.dto.js';
 import { UpdateBeneficiarioDto } from './dto/update-beneficiario.dto.js';
@@ -15,21 +15,18 @@ export class BeneficiariosService {
   constructor(
     @InjectRepository(Beneficiario)
     private readonly beneficiarioRepository: Repository<Beneficiario>,
-  ) { }
+  ) {}
 
-  // Crear beneficiario validando que no exista el documento 
+  // 1. Crear beneficiario validando que no exista el documento (RF-01)
   async create(dto: CreateBeneficiarioDto): Promise<Beneficiario> {
     await this.assertDocumentoDisponible(dto.numeroDocumento);
 
-    const beneficiario = this.beneficiarioRepository.create({
-      ...dto,
-      fechaNacimiento: new Date(dto.fechaNacimiento),
-    });
+    const beneficiario = this.beneficiarioRepository.create(dto);
 
     return await this.saveBeneficiario(beneficiario);
   }
 
-  // Búsqueda en tiempo real con filtros y paginación 
+  // 2. Búsqueda en tiempo real con filtros y paginación (RF-01)
   async findAll(query: QueryBeneficiariosDto) {
     const { page, limit, search, barrio } = query;
 
@@ -39,7 +36,7 @@ export class BeneficiariosService {
     if (search) {
       const searchLiteral = search.replace(/[!%_]/g, '!$&');
       qb.andWhere(
-        "(beneficiario.numeroDocumento LIKE :search ESCAPE '!' OR beneficiario.nombres LIKE :search ESCAPE '!' OR beneficiario.apellidos LIKE :search ESCAPE '!')",
+        "(beneficiario.numeroDocumento LIKE :search ESCAPE '!' OR LOWER(beneficiario.nombres) LIKE LOWER(:search) ESCAPE '!' OR LOWER(beneficiario.apellidos) LIKE LOWER(:search) ESCAPE '!')",
         { search: `%${searchLiteral}%` },
       );
     }
@@ -65,7 +62,7 @@ export class BeneficiariosService {
     };
   }
 
-  //  Consulta rápida para saber si un beneficiario ya existe 
+  // 3. Consulta rápida para saber si un beneficiario ya existe (RF-01 Criterio 1)
   async validarDocumento(numeroDocumento: string) {
     const beneficiario = await this.beneficiarioRepository.findOne({
       where: { numeroDocumento: numeroDocumento.trim() },
@@ -77,7 +74,7 @@ export class BeneficiariosService {
     };
   }
 
-  // Buscar un beneficiario por su ID
+  // 4. Buscar un beneficiario por su ID
   async findOne(id: string): Promise<Beneficiario> {
     const beneficiario = await this.beneficiarioRepository.findOne({
       where: { id },
@@ -90,7 +87,7 @@ export class BeneficiariosService {
     return beneficiario;
   }
 
-  // Actualizar datos de un beneficiario
+  // 5. Actualizar datos de un beneficiario
   async update(id: string, dto: UpdateBeneficiarioDto): Promise<Beneficiario> {
     const beneficiario = await this.findOne(id);
 
@@ -99,17 +96,12 @@ export class BeneficiariosService {
       await this.assertDocumentoDisponible(dto.numeroDocumento, id);
     }
 
-    if (dto.fechaNacimiento) {
-      beneficiario.fechaNacimiento = new Date(dto.fechaNacimiento);
-      delete dto.fechaNacimiento;
-    }
-
     Object.assign(beneficiario, dto);
 
     return await this.saveBeneficiario(beneficiario);
   }
 
-  // Eliminación lógica (soft delete) para conservar el historial
+  // 6. Eliminación lógica (soft delete) para conservar el historial
   async remove(id: string): Promise<{ mensaje: string }> {
     const beneficiario = await this.findOne(id);
     await this.beneficiarioRepository.softRemove(beneficiario);
@@ -119,7 +111,7 @@ export class BeneficiariosService {
     };
   }
 
-
+  // --- MÉTODOS AUXILIARES DE VALIDACIÓN ---
 
   // Valida que el documento no esté duplicado
   private async assertDocumentoDisponible(numeroDocumento: string, excluirId?: string) {
