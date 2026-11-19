@@ -6,7 +6,7 @@ import {
     MaxLength,
     MinLength,
 } from 'class-validator';
-import { RolEnum } from '../enums/rol.enum.js';
+import { RolEnum } from '../../usuarios/enums/rol.enum.js';
 
 export class RegisterDto {
     @ApiProperty({ example: 'coordinadora@comedor.org' })

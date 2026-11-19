@@ -3,8 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AuthService } from './auth.service.js';
-import { Rol } from './entities/rol.entity.js';
-import { Usuario } from './entities/usuario.entity.js';
+import { Rol } from '../usuarios/entities/rol.entity.js';
+import { Usuario } from '../usuarios/entities/usuario.entity.js';
 
 describe('AuthService', () => {
   let service: AuthService;

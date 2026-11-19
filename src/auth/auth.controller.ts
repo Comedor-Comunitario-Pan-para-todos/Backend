@@ -18,7 +18,7 @@ import { AuthService } from './auth.service.js';
 import { Roles } from './decorators/roles.decorator.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
-import { RolEnum } from './enums/rol.enum.js';
+import { RolEnum } from '../usuarios/enums/rol.enum.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
 

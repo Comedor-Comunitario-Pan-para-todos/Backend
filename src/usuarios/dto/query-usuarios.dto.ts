@@ -9,7 +9,7 @@ import {
     Max,
     Min,
 } from 'class-validator';
-import { RolEnum } from '../../auth/enums/rol.enum.js';
+import { RolEnum } from '../enums/rol.enum.js';
 
 export class QueryUsuariosDto {
     @ApiPropertyOptional({ default: 1 })

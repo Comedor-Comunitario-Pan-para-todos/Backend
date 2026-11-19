@@ -11,9 +11,9 @@ import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
-import { Rol } from './entities/rol.entity.js';
-import { Usuario } from './entities/usuario.entity.js';
-import { RolEnum } from './enums/rol.enum.js';
+import { Rol } from '../usuarios/entities/rol.entity.js';
+import { Usuario } from '../usuarios/entities/usuario.entity.js';
+import { RolEnum } from '../usuarios/enums/rol.enum.js';
 import { JwtPayload } from './strategies/jwt.strategy.js';
 
 @Injectable()

@@ -21,8 +21,8 @@ import {
     ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator.js';
-import { Usuario } from '../auth/entities/usuario.entity.js';
-import { RolEnum } from '../auth/enums/rol.enum.js';
+import { Usuario } from './entities/usuario.entity.js';
+import { RolEnum } from './enums/rol.enum.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';

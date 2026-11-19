@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
-import { RolEnum } from './enums/rol.enum.js';
+import { RolEnum } from '../usuarios/enums/rol.enum.js';
 
 describe('AuthController', () => {
   let controller: AuthController;

@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import * as bcrypt from 'bcrypt';
 import { QueryFailedError } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RolEnum } from '../auth/enums/rol.enum.js';
+import { RolEnum } from './enums/rol.enum.js';
 import { UsuariosService } from './usuarios.service.js';
 
 const rolCoordinadora = { id: 1, nombre: RolEnum.COORDINADORA };
