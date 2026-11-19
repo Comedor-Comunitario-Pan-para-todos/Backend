@@ -9,3 +9,4 @@ export interface TokenServicePort {
 }
 
 export const TOKEN_SERVICE_PORT = Symbol('TokenServicePort');
+
