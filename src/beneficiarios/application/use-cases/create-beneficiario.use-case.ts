@@ -23,3 +23,4 @@ export class CreateBeneficiarioUseCase {
     return this.beneficiarioRepo.save(dto);
   }
 }
+

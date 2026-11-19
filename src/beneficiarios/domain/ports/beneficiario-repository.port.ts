@@ -25,3 +25,4 @@ export interface BeneficiarioRepositoryPort {
 }
 
 export const BENEFICIARIO_REPOSITORY_PORT = Symbol('BeneficiarioRepositoryPort');
+

@@ -17,3 +17,4 @@ export class BeneficiarioModel {
     return `${this.nombres} ${this.apellidos}`.trim();
   }
 }
+
