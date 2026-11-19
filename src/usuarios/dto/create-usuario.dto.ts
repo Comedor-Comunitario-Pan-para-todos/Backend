@@ -8,7 +8,7 @@ import {
     MaxLength,
     MinLength,
 } from 'class-validator';
-import { RolEnum } from '../../auth/enums/rol.enum.js';
+import { RolEnum } from '../enums/rol.enum.js';
 
 const normalizarEmail = ({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value;

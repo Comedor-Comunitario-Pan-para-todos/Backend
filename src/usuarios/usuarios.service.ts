@@ -7,9 +7,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Not, QueryFailedError, Repository } from 'typeorm';
-import { Rol } from '../auth/entities/rol.entity.js';
-import { Usuario } from '../auth/entities/usuario.entity.js';
-import { RolEnum } from '../auth/enums/rol.enum.js';
+import { Rol } from './entities/rol.entity.js';
+import { Usuario } from './entities/usuario.entity.js';
+import { RolEnum } from './enums/rol.enum.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
 import { QueryUsuariosDto } from './dto/query-usuarios.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';

@@ -9,7 +9,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ROLES_KEY } from '../auth/decorators/roles.decorator.js';
-import { RolEnum } from '../auth/enums/rol.enum.js';
+import { RolEnum } from './enums/rol.enum.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { UsuariosController } from './usuarios.controller.js';
 import { UsuariosService } from './usuarios.service.js';
