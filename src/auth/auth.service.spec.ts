@@ -1,31 +1,13 @@
-import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AuthService } from './auth.service.js';
 import { Rol } from '../usuarios/entities/rol.entity.js';
-import { Usuario } from '../usuarios/entities/usuario.entity.js';
+import { LoginUseCase } from './application/use-cases/login.use-case.js';
+import { RegisterUseCase } from './application/use-cases/register.use-case.js';
+import { AuthService } from './auth.service.js';
 
 describe('AuthService', () => {
   let service: AuthService;
-
-  const mockUsuarioRepository = {
-    findOne: () => Promise.resolve(null),
-    create: (dto: any) => dto,
-    save: (entity: any) => Promise.resolve({ id: 'uuid-123', ...entity }),
-    createQueryBuilder: () => ({
-      addSelect: function () {
-        return this;
-      },
-      leftJoinAndSelect: function () {
-        return this;
-      },
-      where: function () {
-        return this;
-      },
-      getOne: () => Promise.resolve(null),
-    }),
-  };
 
   const mockRolRepository = {
     findOne: () => Promise.resolve(null),
@@ -33,8 +15,12 @@ describe('AuthService', () => {
     save: (entity: any) => Promise.resolve({ id: 1, ...entity }),
   };
 
-  const mockJwtService = {
-    sign: () => 'fake-jwt-token',
+  const mockLoginUseCase = {
+    execute: () => Promise.resolve({ accessToken: 'token' }),
+  };
+
+  const mockRegisterUseCase = {
+    execute: () => Promise.resolve({ id: '1' }),
   };
 
   beforeEach(async () => {
@@ -42,16 +28,16 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         {
-          provide: getRepositoryToken(Usuario),
-          useValue: mockUsuarioRepository,
-        },
-        {
           provide: getRepositoryToken(Rol),
           useValue: mockRolRepository,
         },
         {
-          provide: JwtService,
-          useValue: mockJwtService,
+          provide: LoginUseCase,
+          useValue: mockLoginUseCase,
+        },
+        {
+          provide: RegisterUseCase,
+          useValue: mockRegisterUseCase,
         },
       ],
     }).compile();
