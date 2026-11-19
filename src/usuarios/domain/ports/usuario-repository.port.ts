@@ -29,3 +29,4 @@ export interface UsuarioRepositoryPort {
 }
 
 export const USUARIO_REPOSITORY_PORT = Symbol('UsuarioRepositoryPort');
+

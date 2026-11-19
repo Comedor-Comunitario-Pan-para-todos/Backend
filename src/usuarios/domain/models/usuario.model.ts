@@ -20,3 +20,4 @@ export class UsuarioModel {
     public readonly updatedAt?: Date,
   ) {}
 }
+
