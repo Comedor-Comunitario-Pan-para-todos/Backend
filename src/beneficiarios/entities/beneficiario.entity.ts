@@ -13,11 +13,11 @@ export class Beneficiario {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 20 })
-  tipoDocumento: string; // Ej: CC, TI, RC, PPT
+  @Column({ length: 20, nullable: true })
+  tipoDocumento?: string; // CC, TI, RC, PPT
 
-  @Column({ length: 50, unique: true })
-  numeroDocumento: string;
+  @Column({ length: 50, unique: true, nullable: true })
+  numeroDocumento?: string;
 
   @Index()
   @Column({ length: 100 })
@@ -31,10 +31,13 @@ export class Beneficiario {
   fechaNacimiento: string;
 
   @Column({ length: 100, nullable: true })
-  barrio: string;
+  barrio?: string;
 
   @Column({ length: 20, nullable: true })
-  telefono: string;
+  telefono?: string;
+
+  @Column({ default: false })
+  autorizaTratamientoDatos: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
