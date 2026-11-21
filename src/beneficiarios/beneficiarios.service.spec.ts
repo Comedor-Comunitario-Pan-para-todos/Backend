@@ -14,6 +14,7 @@ const crearBeneficiarioMock = (overrides: Record<string, unknown> = {}) => ({
   fechaNacimiento: '1995-04-15',
   barrio: 'El Jardín',
   telefono: '3151234567',
+  autorizaTratamientoDatos: true,
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
@@ -56,8 +57,8 @@ describe('BeneficiariosService (RF-01)', () => {
     service = new BeneficiariosService(mockRepository as any);
   });
 
-  describe('create (Registro único de beneficiarios)', () => {
-    const dto: CreateBeneficiarioDto = {
+  describe('create (Registro de beneficiarios con y sin documento - RF-01, RNF-15)', () => {
+    const dtoConDocumento: CreateBeneficiarioDto = {
       tipoDocumento: 'CC',
       numeroDocumento: '1088234567',
       nombres: 'María Camila',
@@ -65,24 +66,59 @@ describe('BeneficiariosService (RF-01)', () => {
       fechaNacimiento: '1995-04-15',
       barrio: 'El Jardín',
       telefono: '3151234567',
+      autorizaTratamientoDatos: true,
+    };
+
+    const dtoSinDocumento: CreateBeneficiarioDto = {
+      nombres: 'Juan Carlos',
+      apellidos: 'Pérez Gómez',
+      fechaNacimiento: '1988-11-20',
+      barrio: 'San Nicolás',
+      autorizaTratamientoDatos: true,
     };
 
     it('debe registrar un beneficiario exitosamente cuando el documento no existe', async () => {
-      mockQueryBuilder.getOne.mockResolvedValue(null); // No existe previo
+      mockQueryBuilder.getOne.mockResolvedValue(null);
       mockRepository.save.mockResolvedValue(crearBeneficiarioMock());
 
-      const resultado = await service.create(dto);
+      const resultado = await service.create(dtoConDocumento);
 
       expect(resultado).toBeDefined();
       expect(resultado.numeroDocumento).toBe('1088234567');
-      expect(mockRepository.create).toHaveBeenCalledWith(dto);
+      expect(mockRepository.create).toHaveBeenCalledWith(dtoConDocumento);
       expect(mockRepository.save).toHaveBeenCalled();
     });
 
-    it('debe lanzar ConflictException (409) si ya existe un beneficiario con ese documento (Criterio 2)', async () => {
-      mockQueryBuilder.getOne.mockResolvedValue(crearBeneficiarioMock()); // Ya existe
+    it('debe permitir registrar una persona sin documento (indocumentado / situación de calle)', async () => {
+      mockQueryBuilder.getOne.mockResolvedValue(null);
+      mockRepository.save.mockResolvedValue(
+        crearBeneficiarioMock({
+          tipoDocumento: null,
+          numeroDocumento: null,
+          nombres: 'Juan Carlos',
+          apellidos: 'Pérez Gómez',
+          barrio: 'San Nicolás',
+        }),
+      );
 
-      await expect(service.create(dto)).rejects.toThrow(ConflictException);
+      const resultado = await service.create(dtoSinDocumento);
+
+      expect(resultado).toBeDefined();
+      expect(mockRepository.create).toHaveBeenCalledWith(dtoSinDocumento);
+      expect(mockRepository.save).toHaveBeenCalled();
+    });
+
+    it('debe rechazar duplicados de personas sin documento con los mismos nombres, fecha de nacimiento y barrio (RNF-15)', async () => {
+      mockQueryBuilder.getOne.mockResolvedValue(crearBeneficiarioMock()); // Ya existe uno con esos datos básicos
+
+      await expect(service.create(dtoSinDocumento)).rejects.toThrow(ConflictException);
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar ConflictException (409) si ya existe un beneficiario con ese documento', async () => {
+      mockQueryBuilder.getOne.mockResolvedValue(crearBeneficiarioMock());
+
+      await expect(service.create(dtoConDocumento)).rejects.toThrow(ConflictException);
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 
@@ -90,22 +126,24 @@ describe('BeneficiariosService (RF-01)', () => {
       mockQueryBuilder.getOne.mockResolvedValue(null);
       mockRepository.save.mockRejectedValue(errorDocumentoDuplicado());
 
-      await expect(service.create(dto)).rejects.toThrow(ConflictException);
+      await expect(service.create(dtoConDocumento)).rejects.toThrow(ConflictException);
     });
   });
 
-  describe('validarDocumento (Validación rápida en tiempo real - Criterio 1)', () => {
-    it('debe retornar { existe: true } si el documento ya se encuentra registrado', async () => {
+  describe('validarDocumento (Validación rápida en tiempo real normalizando documento)', () => {
+    it('debe normalizar y retornar { existe: true } si el documento ya se encuentra registrado', async () => {
       mockRepository.findOne.mockResolvedValue(crearBeneficiarioMock());
 
-      const res = await service.validarDocumento('1088234567');
+      const res = await service.validarDocumento('10.882.345-67');
 
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { numeroDocumento: '1088234567' },
+      });
       expect(res.existe).toBe(true);
       expect(res.beneficiario).toBeDefined();
-      expect(res.beneficiario?.numeroDocumento).toBe('1088234567');
     });
 
-    it('debe retornar { existe: false } si el documento no está registrado', async () => {
+    it('debe retornar { existe: false } si el documento no está registrado o viene vacío', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       const res = await service.validarDocumento('99999999');
@@ -115,7 +153,7 @@ describe('BeneficiariosService (RF-01)', () => {
     });
   });
 
-  describe('findAll (Búsqueda en tiempo real y paginación)', () => {
+  describe('findAll (Búsqueda en tiempo real por nombre completo y paginación)', () => {
     it('debe listar beneficiarios paginados correctamente', async () => {
       const lista = [crearBeneficiarioMock()];
       mockQueryBuilder.getManyAndCount.mockResolvedValue([lista, 1]);
@@ -126,14 +164,14 @@ describe('BeneficiariosService (RF-01)', () => {
       expect(res.meta).toEqual({ total: 1, page: 1, limit: 10, totalPages: 1 });
     });
 
-    it('debe aplicar filtros de búsqueda en tiempo real por documento, nombres o apellidos', async () => {
+    it('debe buscar tanto por partes individuales como por nombre completo (CONCAT)', async () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
-      await service.findAll({ page: 1, limit: 10, search: 'María' });
+      await service.findAll({ page: 1, limit: 10, search: 'María Camila' });
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        expect.stringContaining('beneficiario.numeroDocumento LIKE :search'),
-        expect.objectContaining({ search: '%María%' }),
+        expect.stringContaining("CONCAT(beneficiario.nombres, ' ', beneficiario.apellidos)"),
+        expect.objectContaining({ search: '%María Camila%' }),
       );
     });
 

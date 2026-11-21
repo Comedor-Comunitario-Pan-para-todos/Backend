@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+    IsBoolean,
     IsDateString,
+    IsIn,
     IsNotEmpty,
     IsOptional,
     IsString,
@@ -9,19 +11,23 @@ import {
 } from 'class-validator';
 
 export class CreateBeneficiarioDto {
-    @ApiProperty({ example: 'CC', description: 'Tipo de documento (CC, TI, RC, PPT)' })
+    @ApiPropertyOptional({ example: 'CC', description: 'Tipo de documento (CC, TI, RC, PPT)' })
+    @IsOptional()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
     @IsString()
-    @IsNotEmpty({ message: 'El tipo de documento es requerido' })
-    @MaxLength(20, { message: 'El tipo de documento no puede superar 20 caracteres' })
-    tipoDocumento: string;
+    @IsIn(['CC', 'TI', 'RC', 'PPT'], {
+        message: 'El tipo de documento debe ser CC, TI, RC o PPT',
+    })
+    tipoDocumento?: string;
 
-    @ApiProperty({ example: '1088234567', description: 'Número de documento único' })
-    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+    @ApiPropertyOptional({ example: '1088234567', description: 'Número de documento normalizado' })
+    @IsOptional()
+    @Transform(({ value }) =>
+        typeof value === 'string' ? value.replace(/[^a-zA-Z0-9]/g, '').trim() : value,
+    )
     @IsString()
-    @IsNotEmpty({ message: 'El número de documento es requerido' })
     @MaxLength(50, { message: 'El número de documento no puede superar 50 caracteres' })
-    numeroDocumento: string;
+    numeroDocumento?: string;
 
     @ApiProperty({ example: 'María Camila' })
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
@@ -55,4 +61,11 @@ export class CreateBeneficiarioDto {
     @IsString()
     @MaxLength(20, { message: 'El teléfono no puede superar 20 caracteres' })
     telefono?: string;
+
+    @ApiProperty({
+        example: true,
+        description: 'Consentimiento para el tratamiento de datos personales (Ley 1581)',
+    })
+    @IsBoolean({ message: 'La autorización de datos debe ser verdadera o falsa' })
+    autorizaTratamientoDatos: boolean;
 }

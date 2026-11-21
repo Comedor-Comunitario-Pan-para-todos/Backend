@@ -13,14 +13,27 @@ export class CreateBeneficiarioUseCase {
   ) {}
 
   async execute(dto: CreateBeneficiarioDto) {
-    const existe = await this.beneficiarioRepo.findByDocumento(dto.numeroDocumento);
-    if (existe) {
-      throw new ConflictException(
-        `Ya existe un beneficiario registrado con el documento ${dto.numeroDocumento}`,
+    if (dto.numeroDocumento) {
+      const existe = await this.beneficiarioRepo.findByDocumento(dto.numeroDocumento);
+      if (existe) {
+        throw new ConflictException(
+          `Ya existe un beneficiario registrado con el documento ${dto.numeroDocumento}`,
+        );
+      }
+    } else {
+      const existe = await this.beneficiarioRepo.findByDatosBasicos(
+        dto.nombres,
+        dto.apellidos,
+        dto.fechaNacimiento,
+        dto.barrio,
       );
+      if (existe) {
+        throw new ConflictException(
+          'Ya existe un beneficiario registrado con los mismos nombres, apellidos, fecha de nacimiento y barrio',
+        );
+      }
     }
 
     return this.beneficiarioRepo.save(dto);
   }
 }
-

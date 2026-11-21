@@ -17,9 +17,18 @@ export class BeneficiariosService {
     private readonly beneficiarioRepository: Repository<Beneficiario>,
   ) {}
 
-  // 1. Crear beneficiario validando que no exista el documento (RF-01)
+  // 1. Crear beneficiario validando documento o datos básicos para indocumentados (RF-01, RNF-15)
   async create(dto: CreateBeneficiarioDto): Promise<Beneficiario> {
-    await this.assertDocumentoDisponible(dto.numeroDocumento);
+    if (dto.numeroDocumento) {
+      await this.assertDocumentoDisponible(dto.numeroDocumento);
+    } else {
+      await this.assertDatosBasicosDisponibles(
+        dto.nombres,
+        dto.apellidos,
+        dto.fechaNacimiento,
+        dto.barrio,
+      );
+    }
 
     const beneficiario = this.beneficiarioRepository.create(dto);
 
@@ -32,11 +41,11 @@ export class BeneficiariosService {
 
     const qb = this.beneficiarioRepository.createQueryBuilder('beneficiario');
 
-    // Búsqueda en tiempo real por documento, nombre o apellido
+    // Búsqueda en tiempo real por documento, nombre, apellido o nombre completo
     if (search) {
       const searchLiteral = search.replace(/[!%_]/g, '!$&');
       qb.andWhere(
-        "(beneficiario.numeroDocumento LIKE :search ESCAPE '!' OR LOWER(beneficiario.nombres) LIKE LOWER(:search) ESCAPE '!' OR LOWER(beneficiario.apellidos) LIKE LOWER(:search) ESCAPE '!')",
+        "(beneficiario.numeroDocumento LIKE :search ESCAPE '!' OR LOWER(beneficiario.nombres) LIKE LOWER(:search) ESCAPE '!' OR LOWER(beneficiario.apellidos) LIKE LOWER(:search) ESCAPE '!' OR LOWER(CONCAT(beneficiario.nombres, ' ', beneficiario.apellidos)) LIKE LOWER(:search) ESCAPE '!')",
         { search: `%${searchLiteral}%` },
       );
     }
@@ -64,8 +73,16 @@ export class BeneficiariosService {
 
   // 3. Consulta rápida para saber si un beneficiario ya existe (RF-01 Criterio 1)
   async validarDocumento(numeroDocumento: string) {
+    const docNormalizado = numeroDocumento
+      ? numeroDocumento.replace(/[^a-zA-Z0-9]/g, '').trim()
+      : '';
+
+    if (!docNormalizado) {
+      return { existe: false, beneficiario: null };
+    }
+
     const beneficiario = await this.beneficiarioRepository.findOne({
-      where: { numeroDocumento: numeroDocumento.trim() },
+      where: { numeroDocumento: docNormalizado },
     });
 
     return {
@@ -115,6 +132,8 @@ export class BeneficiariosService {
 
   // Valida que el documento no esté duplicado
   private async assertDocumentoDisponible(numeroDocumento: string, excluirId?: string) {
+    if (!numeroDocumento) return;
+
     const query = this.beneficiarioRepository
       .createQueryBuilder('beneficiario')
       .where('beneficiario.numeroDocumento = :numeroDocumento', {
@@ -130,6 +149,39 @@ export class BeneficiariosService {
     if (existe) {
       throw new ConflictException(
         `Ya existe un beneficiario registrado con el número de documento ${numeroDocumento}`,
+      );
+    }
+  }
+
+  // Valida que para personas indocumentadas no se repita nombres, apellidos, fecha de nacimiento y barrio (RNF-15)
+  private async assertDatosBasicosDisponibles(
+    nombres: string,
+    apellidos: string,
+    fechaNacimiento: string,
+    barrio?: string,
+    excluirId?: string,
+  ) {
+    const query = this.beneficiarioRepository
+      .createQueryBuilder('beneficiario')
+      .where('LOWER(beneficiario.nombres) = LOWER(:nombres)', { nombres: nombres.trim() })
+      .andWhere('LOWER(beneficiario.apellidos) = LOWER(:apellidos)', {
+        apellidos: apellidos.trim(),
+      })
+      .andWhere('beneficiario.fechaNacimiento = :fechaNacimiento', { fechaNacimiento });
+
+    if (barrio) {
+      query.andWhere('LOWER(beneficiario.barrio) = LOWER(:barrio)', { barrio: barrio.trim() });
+    }
+
+    if (excluirId) {
+      query.andWhere('beneficiario.id != :excluirId', { excluirId });
+    }
+
+    const existe = await query.getOne();
+
+    if (existe) {
+      throw new ConflictException(
+        'Ya existe un beneficiario registrado con los mismos nombres, apellidos, fecha de nacimiento y barrio',
       );
     }
   }
