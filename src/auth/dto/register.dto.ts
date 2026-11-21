@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsNotEmpty, MinLength } from 'class-validator';
-import { RolEnum } from '../enums/rol.enum.js';
+import {
+    IsEmail,
+    IsEnum,
+    IsNotEmpty,
+    MaxLength,
+    MinLength,
+} from 'class-validator';
+import { RolEnum } from '../../usuarios/enums/rol.enum.js';
 
 export class RegisterDto {
     @ApiProperty({ example: 'coordinadora@comedor.org' })
@@ -13,8 +19,9 @@ export class RegisterDto {
     @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
     password: string;
 
-    @ApiProperty({ example: 'Ana María Gómez' })
+    @ApiProperty({ example: 'Ana María Gómez', maxLength: 255 })
     @IsNotEmpty({ message: 'El nombre completo es requerido' })
+    @MaxLength(255, { message: 'El nombre completo no puede superar 255 caracteres' })
     nombreCompleto: string;
 
     @ApiProperty({ enum: RolEnum, example: RolEnum.COORDINADORA })
