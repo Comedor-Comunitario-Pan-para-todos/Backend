@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -9,6 +10,8 @@ import { Beneficiario } from './entities/beneficiario.entity.js';
 import { CreateBeneficiarioDto } from './dto/create-beneficiario.dto.js';
 import { UpdateBeneficiarioDto } from './dto/update-beneficiario.dto.js';
 import { QueryBeneficiariosDto } from './dto/query-beneficiarios.dto.js';
+import { NivelRegistroEnum } from './enums/nivel-registro.enum.js';
+import { BeneficiarioModel } from './domain/models/beneficiario.model.js';
 
 @Injectable()
 export class BeneficiariosService {
@@ -17,11 +20,50 @@ export class BeneficiariosService {
     private readonly beneficiarioRepository: Repository<Beneficiario>,
   ) {}
 
-  // 1. Crear beneficiario validando que no exista el documento (RF-01)
+  // 1. Crear beneficiario validando nivel de sensibilidad y duplicados (RF-01, RF-02, RNF-15)
   async create(dto: CreateBeneficiarioDto): Promise<Beneficiario> {
-    await this.assertDocumentoDisponible(dto.numeroDocumento);
+    const nivelRegistro = dto.nivelRegistro || NivelRegistroEnum.BASICO;
 
-    const beneficiario = this.beneficiarioRepository.create(dto);
+    // Validación condicional del formulario extendido (RF-02 / HU-13 Criterio 3)
+    if (nivelRegistro === NivelRegistroEnum.EXTENDIDO) {
+      if ((dto.tipoDocumento && !dto.numeroDocumento) || (!dto.tipoDocumento && dto.numeroDocumento)) {
+        throw new BadRequestException(
+          'En el registro extendido, si se especifica el tipo de documento también debe indicarse el número y viceversa',
+        );
+      }
+    }
+
+    // Minimización de datos para el nivel básico (RF-02 / HU-13 Criterio 4 - Ley 1581)
+    const datosPersistir: Partial<Beneficiario> = {
+      nivelRegistro,
+      nombres: dto.nombres.trim(),
+      apellidos: dto.apellidos.trim(),
+      fechaNacimiento: dto.fechaNacimiento,
+      barrio: dto.barrio?.trim() || undefined,
+      autorizaTratamientoDatos: dto.autorizaTratamientoDatos,
+      esMenorEdad: BeneficiarioModel.calcularEsMenorEdad(dto.fechaNacimiento),
+    };
+
+    if (nivelRegistro === NivelRegistroEnum.EXTENDIDO) {
+      datosPersistir.tipoDocumento = dto.tipoDocumento || undefined;
+      datosPersistir.numeroDocumento = dto.numeroDocumento || undefined;
+      datosPersistir.telefono = dto.telefono?.trim() || undefined;
+      datosPersistir.clasificacionSocioeconomica = dto.clasificacionSocioeconomica?.trim() || undefined;
+    }
+
+    // Prevención de duplicados (RF-01, RNF-15)
+    if (datosPersistir.numeroDocumento) {
+      await this.assertDocumentoDisponible(datosPersistir.numeroDocumento);
+    } else {
+      await this.assertDatosBasicosDisponibles(
+        datosPersistir.nombres!,
+        datosPersistir.apellidos!,
+        datosPersistir.fechaNacimiento!,
+        datosPersistir.barrio,
+      );
+    }
+
+    const beneficiario = this.beneficiarioRepository.create(datosPersistir);
 
     return await this.saveBeneficiario(beneficiario);
   }
@@ -32,11 +74,11 @@ export class BeneficiariosService {
 
     const qb = this.beneficiarioRepository.createQueryBuilder('beneficiario');
 
-    // Búsqueda en tiempo real por documento, nombre o apellido
+    // Búsqueda en tiempo real por documento, nombre, apellido o nombre completo
     if (search) {
       const searchLiteral = search.replace(/[!%_]/g, '!$&');
       qb.andWhere(
-        "(beneficiario.numeroDocumento LIKE :search ESCAPE '!' OR LOWER(beneficiario.nombres) LIKE LOWER(:search) ESCAPE '!' OR LOWER(beneficiario.apellidos) LIKE LOWER(:search) ESCAPE '!')",
+        "(beneficiario.numeroDocumento LIKE :search ESCAPE '!' OR LOWER(beneficiario.nombres) LIKE LOWER(:search) ESCAPE '!' OR LOWER(beneficiario.apellidos) LIKE LOWER(:search) ESCAPE '!' OR LOWER(CONCAT(beneficiario.nombres, ' ', beneficiario.apellidos)) LIKE LOWER(:search) ESCAPE '!')",
         { search: `%${searchLiteral}%` },
       );
     }
@@ -64,8 +106,16 @@ export class BeneficiariosService {
 
   // 3. Consulta rápida para saber si un beneficiario ya existe (RF-01 Criterio 1)
   async validarDocumento(numeroDocumento: string) {
+    const docNormalizado = numeroDocumento
+      ? numeroDocumento.replace(/[^a-zA-Z0-9]/g, '').trim()
+      : '';
+
+    if (!docNormalizado) {
+      return { existe: false, beneficiario: null };
+    }
+
     const beneficiario = await this.beneficiarioRepository.findOne({
-      where: { numeroDocumento: numeroDocumento.trim() },
+      where: { numeroDocumento: docNormalizado },
     });
 
     return {
@@ -96,6 +146,11 @@ export class BeneficiariosService {
       await this.assertDocumentoDisponible(dto.numeroDocumento, id);
     }
 
+    // Si se actualiza fecha de nacimiento, recalcular esMenorEdad
+    if (dto.fechaNacimiento) {
+      beneficiario.esMenorEdad = BeneficiarioModel.calcularEsMenorEdad(dto.fechaNacimiento);
+    }
+
     Object.assign(beneficiario, dto);
 
     return await this.saveBeneficiario(beneficiario);
@@ -115,6 +170,8 @@ export class BeneficiariosService {
 
   // Valida que el documento no esté duplicado
   private async assertDocumentoDisponible(numeroDocumento: string, excluirId?: string) {
+    if (!numeroDocumento) return;
+
     const query = this.beneficiarioRepository
       .createQueryBuilder('beneficiario')
       .where('beneficiario.numeroDocumento = :numeroDocumento', {
@@ -130,6 +187,39 @@ export class BeneficiariosService {
     if (existe) {
       throw new ConflictException(
         `Ya existe un beneficiario registrado con el número de documento ${numeroDocumento}`,
+      );
+    }
+  }
+
+  // Valida que para personas indocumentadas no se repita nombres, apellidos, fecha de nacimiento y barrio (RNF-15)
+  private async assertDatosBasicosDisponibles(
+    nombres: string,
+    apellidos: string,
+    fechaNacimiento: string,
+    barrio?: string,
+    excluirId?: string,
+  ) {
+    const query = this.beneficiarioRepository
+      .createQueryBuilder('beneficiario')
+      .where('LOWER(beneficiario.nombres) = LOWER(:nombres)', { nombres: nombres.trim() })
+      .andWhere('LOWER(beneficiario.apellidos) = LOWER(:apellidos)', {
+        apellidos: apellidos.trim(),
+      })
+      .andWhere('beneficiario.fechaNacimiento = :fechaNacimiento', { fechaNacimiento });
+
+    if (barrio) {
+      query.andWhere('LOWER(beneficiario.barrio) = LOWER(:barrio)', { barrio: barrio.trim() });
+    }
+
+    if (excluirId) {
+      query.andWhere('beneficiario.id != :excluirId', { excluirId });
+    }
+
+    const existe = await query.getOne();
+
+    if (existe) {
+      throw new ConflictException(
+        'Ya existe un beneficiario registrado con los mismos nombres, apellidos, fecha de nacimiento y barrio',
       );
     }
   }

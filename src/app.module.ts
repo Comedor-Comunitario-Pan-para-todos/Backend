@@ -9,6 +9,9 @@ import { Usuario } from './usuarios/entities/usuario.entity.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
 import { BeneficiariosModule } from './beneficiarios/beneficiarios.module.js';
 import { Beneficiario } from './beneficiarios/entities/beneficiario.entity.js';
+import { TurnosModule } from './turnos/turnos.module.js';
+import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
+
 @Module({
   imports: [
     // 1. Carga las variables de entorno de .env globalmente
@@ -27,7 +30,7 @@ import { Beneficiario } from './beneficiarios/entities/beneficiario.entity.js';
         username: configService.get<string>('DB_USER', 'root'),
         password: configService.get<string>('DB_PASSWORD', ''),
         database: configService.get<string>('DB_NAME', 'comedor_pan_para_todos'),
-        entities: [Usuario, Rol, Beneficiario],
+        entities: [Usuario, Rol, Beneficiario, TurnoAtencion],
         synchronize: true, // Sincroniza las entidades automáticamente creando las tablas en MySQL
       }),
     }),
@@ -37,8 +40,10 @@ import { Beneficiario } from './beneficiarios/entities/beneficiario.entity.js';
     UsuariosModule,
 
     BeneficiariosModule,
+
+    TurnosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

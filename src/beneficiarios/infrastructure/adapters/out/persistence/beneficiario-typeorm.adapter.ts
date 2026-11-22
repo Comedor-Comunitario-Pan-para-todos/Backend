@@ -19,13 +19,17 @@ export class BeneficiarioTypeOrmAdapter implements BeneficiarioRepositoryPort {
   private toModel(b: Beneficiario): BeneficiarioModel {
     return new BeneficiarioModel(
       b.id,
-      b.tipoDocumento,
-      b.numeroDocumento,
+      b.nivelRegistro,
+      b.tipoDocumento ?? null,
+      b.numeroDocumento ?? null,
       b.nombres,
       b.apellidos,
       b.fechaNacimiento,
+      b.esMenorEdad ?? false,
       b.barrio,
       b.telefono,
+      b.clasificacionSocioeconomica,
+      b.autorizaTratamientoDatos,
       b.createdAt,
       b.updatedAt,
       b.deletedAt,
@@ -48,13 +52,32 @@ export class BeneficiarioTypeOrmAdapter implements BeneficiarioRepositoryPort {
     return b ? this.toModel(b) : null;
   }
 
+  async findByDatosBasicos(
+    nombres: string,
+    apellidos: string,
+    fechaNacimiento: string,
+    barrio?: string,
+  ): Promise<BeneficiarioModel | null> {
+    const qb = this.repo.createQueryBuilder('beneficiario')
+      .where('LOWER(beneficiario.nombres) = LOWER(:nombres)', { nombres: nombres.trim() })
+      .andWhere('LOWER(beneficiario.apellidos) = LOWER(:apellidos)', { apellidos: apellidos.trim() })
+      .andWhere('beneficiario.fechaNacimiento = :fechaNacimiento', { fechaNacimiento });
+
+    if (barrio) {
+      qb.andWhere('LOWER(beneficiario.barrio) = LOWER(:barrio)', { barrio: barrio.trim() });
+    }
+
+    const b = await qb.getOne();
+    return b ? this.toModel(b) : null;
+  }
+
   async search(options: BeneficiarioPaginationOptions): Promise<BeneficiarioPaginatedResult> {
     const { page, limit, busqueda } = options;
     const qb = this.repo.createQueryBuilder('beneficiario');
 
     if (busqueda) {
       qb.where(
-        '(beneficiario.numeroDocumento LIKE :busqueda OR LOWER(beneficiario.nombres) LIKE :busquedaLower OR LOWER(beneficiario.apellidos) LIKE :busquedaLower)',
+        '(beneficiario.numeroDocumento LIKE :busqueda OR LOWER(beneficiario.nombres) LIKE :busquedaLower OR LOWER(beneficiario.apellidos) LIKE :busquedaLower OR LOWER(CONCAT(beneficiario.nombres, \' \', beneficiario.apellidos)) LIKE :busquedaLower)',
         {
           busqueda: `%${busqueda}%`,
           busquedaLower: `%${busqueda.toLowerCase()}%`,
