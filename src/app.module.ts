@@ -16,6 +16,9 @@ import {
   incidenteCadenaFrioSchema,
 } from './cadena-frio/infrastructure/adapters/out/persistence/cadena-frio.schemas.js';
 import { CrearCadenaFrio1795305600000 } from './cadena-frio/infrastructure/migrations/1795305600000-crear-cadena-frio.js';
+import { TurnosModule } from './turnos/turnos.module.js';
+import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
+
 @Module({
   imports: [
     // 1. Carga las variables de entorno de .env globalmente
@@ -41,6 +44,7 @@ import { CrearCadenaFrio1795305600000 } from './cadena-frio/infrastructure/migra
           Usuario,
           Rol,
           Beneficiario,
+          TurnoAtencion,
           equipoRefrigeracionSchema,
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
@@ -56,6 +60,7 @@ import { CrearCadenaFrio1795305600000 } from './cadena-frio/infrastructure/migra
     UsuariosModule,
 
     BeneficiariosModule,
+    TurnosModule,
     CadenaFrioModule,
   ],
   controllers: [AppController],

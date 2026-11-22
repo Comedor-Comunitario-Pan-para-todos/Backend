@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -36,21 +37,36 @@ export class BeneficiariosController {
   constructor(private readonly beneficiariosService: BeneficiariosService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Registrar un nuevo beneficiario (RF-01)' })
+  @ApiOperation({
+    summary: 'Registrar un nuevo beneficiario con nivel básico o extendido (RF-01, RF-02)',
+    description:
+      'Permite registrar comensales con nivel BASICO (mínimo: nombres, apellidos, fecha nacimiento) o EXTENDIDO (con documento, teléfono y Sisbén). Aplica minimización de datos según Ley 1581.',
+  })
   @ApiResponse({ status: 201, description: 'Beneficiario registrado exitosamente' })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o faltantes' })
-  @ApiResponse({ status: 409, description: 'El documento ya está registrado' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o inconsistencia en nivel extendido' })
+  @ApiResponse({ status: 409, description: 'El documento o datos básicos ya están registrados' })
   create(@Body() createBeneficiarioDto: CreateBeneficiarioDto) {
     return this.beneficiariosService.create(createBeneficiarioDto);
   }
 
   @Get()
   @ApiOperation({
-    summary: 'Listar y buscar beneficiarios en tiempo real con paginación (RF-01)',
+    summary: 'Listar y buscar beneficiarios en tiempo real con paginación y proyección por rol (RF-01, RF-02)',
   })
   @ApiResponse({ status: 200, description: 'Listado de beneficiarios obtenido exitosamente' })
-  findAll(@Query() query: QueryBeneficiariosDto) {
-    return this.beneficiariosService.findAll(query);
+  async findAll(@Query() query: QueryBeneficiariosDto, @Req() req?: any) {
+    const res = await this.beneficiariosService.findAll(query);
+    const rolNombre = req?.user?.rol?.nombre || req?.user?.rol;
+
+    // Proyección de seguridad RNF-07: datos sensibles (ej. Sisbén) solo visibles para COORDINADORA
+    if (rolNombre && rolNombre !== RolEnum.COORDINADORA) {
+      res.data = res.data.map((b: any) => {
+        const { clasificacionSocioeconomica, ...resto } = b;
+        return resto;
+      });
+    }
+
+    return res;
   }
 
   @Get('validar-documento/:numeroDocumento')
@@ -63,11 +79,19 @@ export class BeneficiariosController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Consultar detalle de un beneficiario por su ID' })
+  @ApiOperation({ summary: 'Consultar detalle de un beneficiario por su ID (RF-01, RF-02)' })
   @ApiResponse({ status: 200, description: 'Detalle del beneficiario' })
   @ApiResponse({ status: 404, description: 'Beneficiario no encontrado' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.beneficiariosService.findOne(id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req?: any) {
+    const beneficiario = await this.beneficiariosService.findOne(id);
+    const rolNombre = req?.user?.rol?.nombre || req?.user?.rol;
+
+    if (rolNombre && rolNombre !== RolEnum.COORDINADORA) {
+      const { clasificacionSocioeconomica, ...resto } = beneficiario as any;
+      return resto;
+    }
+
+    return beneficiario;
   }
 
   @Patch(':id')
