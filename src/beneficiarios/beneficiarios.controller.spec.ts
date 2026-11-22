@@ -33,9 +33,9 @@ describe('BeneficiariosController (RF-01, RF-02)', () => {
     };
     mockService.create.mockResolvedValue({ id: 'uuid-1', ...dto });
 
-    const res = await controller.create(dto as any);
+    const res = await controller.create(dto as any, { user: { id: 'operador', rol: { nombre: RolEnum.COORDINADORA } } });
     expect(res).toBeDefined();
-    expect(mockService.create).toHaveBeenCalledWith(dto);
+    expect(mockService.create).toHaveBeenCalledWith(dto, 'operador');
   });
 
   it('debe listar beneficiarios proyectando datos sensibles solo para COORDINADORA', async () => {

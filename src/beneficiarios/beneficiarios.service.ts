@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +14,9 @@ import { QueryBeneficiariosDto } from './dto/query-beneficiarios.dto.js';
 import { NivelRegistroEnum } from './enums/nivel-registro.enum.js';
 import { BeneficiarioModel } from './domain/models/beneficiario.model.js';
 
+import { prepararConsentimiento } from '../consentimientos/application/consentimientos.service.js';
+import { consentimientoBeneficiarioSchema } from '../consentimientos/infrastructure/consentimiento.schema.js';
+
 @Injectable()
 export class BeneficiariosService {
   constructor(
@@ -21,7 +25,11 @@ export class BeneficiariosService {
   ) {}
 
   // 1. Crear beneficiario validando nivel de sensibilidad y duplicados (RF-01, RF-02, RNF-15)
-  async create(dto: CreateBeneficiarioDto): Promise<Beneficiario> {
+  async create(dto: CreateBeneficiarioDto, usuarioId: string): Promise<Beneficiario> {
+    if (dto.autorizaTratamientoDatos !== true) {
+      throw new BadRequestException('Se requiere la autorización explícita de datos');
+    }
+    const consentimiento = prepararConsentimiento(dto.consentimiento, usuarioId);
     const nivelRegistro = dto.nivelRegistro || NivelRegistroEnum.BASICO;
 
     // Validación condicional del formulario extendido (RF-02 / HU-13 Criterio 3)
@@ -52,20 +60,34 @@ export class BeneficiariosService {
     }
 
     // Prevención de duplicados (RF-01, RNF-15)
-    if (datosPersistir.numeroDocumento) {
-      await this.assertDocumentoDisponible(datosPersistir.numeroDocumento);
-    } else {
-      await this.assertDatosBasicosDisponibles(
-        datosPersistir.nombres!,
-        datosPersistir.apellidos!,
-        datosPersistir.fechaNacimiento!,
-        datosPersistir.barrio,
-      );
+    try {
+      if (datosPersistir.numeroDocumento) {
+        await this.assertDocumentoDisponible(datosPersistir.numeroDocumento);
+      } else {
+        await this.assertDatosBasicosDisponibles(
+          datosPersistir.nombres!,
+          datosPersistir.apellidos!,
+          datosPersistir.fechaNacimiento!,
+          datosPersistir.barrio,
+        );
+      }
+
+      const beneficiario = this.beneficiarioRepository.create(datosPersistir);
+
+      return await this.beneficiarioRepository.manager.transaction(async (manager) => {
+        const guardado = await this.saveBeneficiario(beneficiario, manager.getRepository(Beneficiario));
+        await manager.insert(consentimientoBeneficiarioSchema, {
+          ...consentimiento,
+          beneficiarioId: guardado.id,
+        });
+        return guardado;
+      });
+    } catch (error) {
+      if (error instanceof QueryFailedError) {
+        throw new InternalServerErrorException('No se pudo guardar el alta del beneficiario');
+      }
+      throw error;
     }
-
-    const beneficiario = this.beneficiarioRepository.create(datosPersistir);
-
-    return await this.saveBeneficiario(beneficiario);
   }
 
   // 2. Búsqueda en tiempo real con filtros y paginación (RF-01)
@@ -186,7 +208,7 @@ export class BeneficiariosService {
 
     if (existe) {
       throw new ConflictException(
-        `Ya existe un beneficiario registrado con el número de documento ${numeroDocumento}`,
+        `Ya existe un beneficiario registrado con este número de documento`,
       );
     }
   }
@@ -225,9 +247,12 @@ export class BeneficiariosService {
   }
 
   // Captura el error UNIQUE de MySQL en caso de condiciones de carrera
-  private async saveBeneficiario(beneficiario: Beneficiario): Promise<Beneficiario> {
+  private async saveBeneficiario(
+    beneficiario: Beneficiario,
+    repository = this.beneficiarioRepository,
+  ): Promise<Beneficiario> {
     try {
-      return await this.beneficiarioRepository.save(beneficiario);
+      return await repository.save(beneficiario);
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
