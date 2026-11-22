@@ -19,13 +19,16 @@ export class BeneficiarioTypeOrmAdapter implements BeneficiarioRepositoryPort {
   private toModel(b: Beneficiario): BeneficiarioModel {
     return new BeneficiarioModel(
       b.id,
+      b.nivelRegistro,
       b.tipoDocumento ?? null,
       b.numeroDocumento ?? null,
       b.nombres,
       b.apellidos,
       b.fechaNacimiento,
+      b.esMenorEdad ?? false,
       b.barrio,
       b.telefono,
+      b.clasificacionSocioeconomica,
       b.autorizaTratamientoDatos,
       b.createdAt,
       b.updatedAt,

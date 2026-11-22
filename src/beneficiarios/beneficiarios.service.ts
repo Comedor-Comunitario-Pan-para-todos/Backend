@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -9,6 +10,8 @@ import { Beneficiario } from './entities/beneficiario.entity.js';
 import { CreateBeneficiarioDto } from './dto/create-beneficiario.dto.js';
 import { UpdateBeneficiarioDto } from './dto/update-beneficiario.dto.js';
 import { QueryBeneficiariosDto } from './dto/query-beneficiarios.dto.js';
+import { NivelRegistroEnum } from './enums/nivel-registro.enum.js';
+import { BeneficiarioModel } from './domain/models/beneficiario.model.js';
 
 @Injectable()
 export class BeneficiariosService {
@@ -17,20 +20,50 @@ export class BeneficiariosService {
     private readonly beneficiarioRepository: Repository<Beneficiario>,
   ) {}
 
-  // 1. Crear beneficiario validando documento o datos básicos para indocumentados (RF-01, RNF-15)
+  // 1. Crear beneficiario validando nivel de sensibilidad y duplicados (RF-01, RF-02, RNF-15)
   async create(dto: CreateBeneficiarioDto): Promise<Beneficiario> {
-    if (dto.numeroDocumento) {
-      await this.assertDocumentoDisponible(dto.numeroDocumento);
+    const nivelRegistro = dto.nivelRegistro || NivelRegistroEnum.BASICO;
+
+    // Validación condicional del formulario extendido (RF-02 / HU-13 Criterio 3)
+    if (nivelRegistro === NivelRegistroEnum.EXTENDIDO) {
+      if ((dto.tipoDocumento && !dto.numeroDocumento) || (!dto.tipoDocumento && dto.numeroDocumento)) {
+        throw new BadRequestException(
+          'En el registro extendido, si se especifica el tipo de documento también debe indicarse el número y viceversa',
+        );
+      }
+    }
+
+    // Minimización de datos para el nivel básico (RF-02 / HU-13 Criterio 4 - Ley 1581)
+    const datosPersistir: Partial<Beneficiario> = {
+      nivelRegistro,
+      nombres: dto.nombres.trim(),
+      apellidos: dto.apellidos.trim(),
+      fechaNacimiento: dto.fechaNacimiento,
+      barrio: dto.barrio?.trim() || undefined,
+      autorizaTratamientoDatos: dto.autorizaTratamientoDatos,
+      esMenorEdad: BeneficiarioModel.calcularEsMenorEdad(dto.fechaNacimiento),
+    };
+
+    if (nivelRegistro === NivelRegistroEnum.EXTENDIDO) {
+      datosPersistir.tipoDocumento = dto.tipoDocumento || undefined;
+      datosPersistir.numeroDocumento = dto.numeroDocumento || undefined;
+      datosPersistir.telefono = dto.telefono?.trim() || undefined;
+      datosPersistir.clasificacionSocioeconomica = dto.clasificacionSocioeconomica?.trim() || undefined;
+    }
+
+    // Prevención de duplicados (RF-01, RNF-15)
+    if (datosPersistir.numeroDocumento) {
+      await this.assertDocumentoDisponible(datosPersistir.numeroDocumento);
     } else {
       await this.assertDatosBasicosDisponibles(
-        dto.nombres,
-        dto.apellidos,
-        dto.fechaNacimiento,
-        dto.barrio,
+        datosPersistir.nombres!,
+        datosPersistir.apellidos!,
+        datosPersistir.fechaNacimiento!,
+        datosPersistir.barrio,
       );
     }
 
-    const beneficiario = this.beneficiarioRepository.create(dto);
+    const beneficiario = this.beneficiarioRepository.create(datosPersistir);
 
     return await this.saveBeneficiario(beneficiario);
   }
@@ -111,6 +144,11 @@ export class BeneficiariosService {
     // Si cambió el número de documento, validar que no esté ocupado por otro
     if (dto.numeroDocumento && dto.numeroDocumento !== beneficiario.numeroDocumento) {
       await this.assertDocumentoDisponible(dto.numeroDocumento, id);
+    }
+
+    // Si se actualiza fecha de nacimiento, recalcular esMenorEdad
+    if (dto.fechaNacimiento) {
+      beneficiario.esMenorEdad = BeneficiarioModel.calcularEsMenorEdad(dto.fechaNacimiento);
     }
 
     Object.assign(beneficiario, dto);
