@@ -9,6 +9,13 @@ import { Usuario } from './usuarios/entities/usuario.entity.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
 import { BeneficiariosModule } from './beneficiarios/beneficiarios.module.js';
 import { Beneficiario } from './beneficiarios/entities/beneficiario.entity.js';
+import { CadenaFrioModule } from './cadena-frio/cadena-frio.module.js';
+import {
+  accesoCatalogoSchema,
+  equipoRefrigeracionSchema,
+  incidenteCadenaFrioSchema,
+} from './cadena-frio/infrastructure/adapters/out/persistence/cadena-frio.schemas.js';
+import { CrearCadenaFrio1795305600000 } from './cadena-frio/infrastructure/migrations/1795305600000-crear-cadena-frio.js';
 import { TurnosModule } from './turnos/turnos.module.js';
 import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
 
@@ -29,8 +36,21 @@ import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
         port: configService.get<number>('DB_PORT', 3306),
         username: configService.get<string>('DB_USER', 'root'),
         password: configService.get<string>('DB_PASSWORD', ''),
-        database: configService.get<string>('DB_NAME', 'comedor_pan_para_todos'),
-        entities: [Usuario, Rol, Beneficiario, TurnoAtencion],
+        database: configService.get<string>(
+          'DB_NAME',
+          'comedor_pan_para_todos',
+        ),
+        entities: [
+          Usuario,
+          Rol,
+          Beneficiario,
+          TurnoAtencion,
+          equipoRefrigeracionSchema,
+          incidenteCadenaFrioSchema,
+          accesoCatalogoSchema,
+        ],
+        migrations: [CrearCadenaFrio1795305600000],
+        migrationsRun: true,
         synchronize: true, // Sincroniza las entidades automáticamente creando las tablas en MySQL
       }),
     }),
@@ -40,8 +60,8 @@ import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
     UsuariosModule,
 
     BeneficiariosModule,
-
     TurnosModule,
+    CadenaFrioModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -212,3 +212,31 @@ La solución está orientada a mejorar la trazabilidad de las donaciones, el con
 **SIG-CCPT — Sistema de Información y Gestión para el Comedor Comunitario Pan para Todos**
 
 *Repositorio correspondiente al desarrollo del backend del proyecto.*
+
+
+## RF-10 · Cadena de frío
+
+El contrato Swagger está disponible en `/api/docs`. Ambos endpoints requieren
+un JWT de un usuario activo.
+
+| Método y ruta | Roles | Respuesta |
+|---|---|---|
+| `GET /equipos-refrigeracion` | Voluntario, coordinadora | `200` con el catálogo, incluido el estado de cada equipo |
+| `POST /incidentes-cadena-frio` | Voluntario | `201` con el incidente, el ID del voluntario autenticado y la fecha de registro |
+
+El reporte recibe `equipoId`, `temperaturaObservada` (°C),
+`minutosTranscurridos` (entero no negativo), `insumosAfectados` (lista de
+textos) y `accionCorrectiva` (texto obligatorio). Un equipo inexistente o
+inactivo produce `404`. El reporte se guarda mediante inserción y carece de
+rutas de modificación. Cada consulta exitosa del catálogo deja un registro
+de auditoría con el ID del usuario y la fecha.
+
+La migración del módulo se aplica al arrancar. El catálogo se provisiona con
+los equipos reales de cada instalación. Ejemplo de alta en MySQL:
+
+```sql
+INSERT INTO equipos_refrigeracion (id, nombre, tipo)
+VALUES (UUID(), 'Nevera de cocina', 'NEVERA');
+```
+
+Los tipos admitidos son `NEVERA` y `CONGELADOR`.
