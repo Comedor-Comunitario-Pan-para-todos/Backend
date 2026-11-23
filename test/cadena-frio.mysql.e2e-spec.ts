@@ -1,3 +1,4 @@
+import { CrearCadenaFrio1795305600000 } from '../src/cadena-frio/infrastructure/migrations/1795305600000-crear-cadena-frio.js';
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
@@ -248,11 +249,12 @@ describe.skipIf(process.env.RF10_MYSQL_E2E !== '1')(
         'accesos_catalogo_frio',
       ];
       try {
-        await db.undoLastMigration();
+        const migration = new CrearCadenaFrio1795305600000();
+        await migration.down(runner);
         for (const tabla of tablas) {
           expect(await runner.hasTable(tabla)).toBe(false);
         }
-        await db.runMigrations();
+        await migration.up(runner);
         for (const tabla of tablas) {
           expect(await runner.hasTable(tabla)).toBe(true);
         }

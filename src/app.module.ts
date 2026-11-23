@@ -19,6 +19,10 @@ import { CrearCadenaFrio1795305600000 } from './cadena-frio/infrastructure/migra
 import { TurnosModule } from './turnos/turnos.module.js';
 import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
 
+import { ConsentimientosModule } from './consentimientos/consentimientos.module.js';
+import { consentimientoBeneficiarioSchema } from './consentimientos/infrastructure/consentimiento.schema.js';
+import { CrearConsentimientos1795368000000 } from './consentimientos/infrastructure/migrations/1795368000000-crear-consentimientos.js';
+
 @Module({
   imports: [
     // 1. Carga las variables de entorno de .env globalmente
@@ -48,8 +52,12 @@ import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
           equipoRefrigeracionSchema,
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
+          consentimientoBeneficiarioSchema,
         ],
-        migrations: [CrearCadenaFrio1795305600000],
+        migrations: [
+          CrearCadenaFrio1795305600000,
+          CrearConsentimientos1795368000000,
+        ],
         migrationsRun: true,
         synchronize: true, // Sincroniza las entidades automáticamente creando las tablas en MySQL
       }),
@@ -62,6 +70,7 @@ import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
     BeneficiariosModule,
     TurnosModule,
     CadenaFrioModule,
+    ConsentimientosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

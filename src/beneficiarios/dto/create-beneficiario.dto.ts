@@ -1,7 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
-  IsBoolean,
+  Equals,
+  IsDefined,
+  IsObject,
+  ValidateNested,
   IsDateString,
   IsEnum,
   IsIn,
@@ -11,6 +14,8 @@ import {
   MaxLength,
 } from 'class-validator';
 import { NivelRegistroEnum } from '../enums/nivel-registro.enum.js';
+
+import { RegistrarConsentimientoDto } from '../../consentimientos/dto/registrar-consentimiento.dto.js';
 
 export class CreateBeneficiarioDto {
   @ApiPropertyOptional({
@@ -89,6 +94,13 @@ export class CreateBeneficiarioDto {
     example: true,
     description: 'Consentimiento para el tratamiento de datos personales (Ley 1581)',
   })
-  @IsBoolean({ message: 'La autorización de datos debe ser verdadera o falsa' })
+  @Equals(true, { message: 'La autorización de datos debe ser explícita' })
   autorizaTratamientoDatos: boolean;
+
+  @ApiProperty({ type: RegistrarConsentimientoDto })
+  @IsDefined()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RegistrarConsentimientoDto)
+  consentimiento: RegistrarConsentimientoDto;
 }

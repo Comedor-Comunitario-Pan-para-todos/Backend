@@ -240,3 +240,35 @@ VALUES (UUID(), 'Nevera de cocina', 'NEVERA');
 ```
 
 Los tipos admitidos son `NEVERA` y `CONGELADOR`.
+
+
+## RF-19 · Consentimiento informado
+
+El alta con `POST /beneficiarios` conserva `autorizaTratamientoDatos: true`
+y requiere un objeto `consentimiento`. La ficha y la evidencia de aceptación
+se guardan en una sola transacción. La evidencia no se modifica vía PATCH.
+
+`POST /beneficiarios/:id/consentimiento` registra la evidencia para una ficha
+activa existente. Ambos flujos requieren el JWT de un voluntario o una coordinadora.
+El objeto de consentimiento (cuerpo completo para el segundo endpoint) es:
+
+```json
+{
+  "aceptado": true,
+  "versionTexto": 1,
+  "finalidad": "ATENCION_ALIMENTARIA",
+  "metodo": "VERBAL_CON_TESTIGO"
+}
+```
+
+Los métodos admitidos son `VERBAL_CON_TESTIGO`, `HUELLA` y `FIRMA_SIMPLE`.
+Se guarda el método declarado, la versión, la finalidad, la fecha y el ID del
+operador autenticado. La API registra los datos de la aceptación sin recibir
+imágenes, huellas biométricas ni archivos de firma. El endpoint devuelve
+`201` al registrar una versión, `200` con la evidencia original al repetir
+la misma versión y `404` cuando la ficha no existe o está desactivada.
+
+El contrato está en `/api/docs`. La migración se aplica al iniciar el backend.
+La suite HTTP se ejecuta con `npm run test:e2e -- consentimientos.e2e-spec.ts`.
+La suite `consentimientos.mysql.e2e-spec.ts` se habilita con
+`RF19_MYSQL_E2E=1` y usa una base local temporal.
