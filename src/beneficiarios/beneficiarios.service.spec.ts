@@ -1,3 +1,4 @@
+import { MetodoConsentimiento } from '../consentimientos/domain/consentimiento.js';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -5,6 +6,8 @@ import { BeneficiariosService } from './beneficiarios.service.js';
 import { CreateBeneficiarioDto } from './dto/create-beneficiario.dto.js';
 import { UpdateBeneficiarioDto } from './dto/update-beneficiario.dto.js';
 import { NivelRegistroEnum } from './enums/nivel-registro.enum.js';
+
+const consentimiento = { aceptado: true, versionTexto: 1, finalidad: 'ATENCION_ALIMENTARIA' as const, metodo: MetodoConsentimiento.VERBAL_CON_TESTIGO };
 
 const crearBeneficiarioMock = (overrides: Record<string, unknown> = {}) => ({
   id: 'uuid-beneficiario-1',
@@ -56,6 +59,14 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
     softRemove: vi.fn((entity: any) => Promise.resolve(entity)),
   };
 
+  const manager = {
+    getRepository: () => mockRepository,
+    insert: vi.fn(),
+  };
+  Object.assign(mockRepository, {
+    manager: { transaction: (work: (transaction: typeof manager) => unknown) => work(manager) },
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     service = new BeneficiariosService(mockRepository as any);
@@ -73,6 +84,7 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
       telefono: '3151234567',
       clasificacionSocioeconomica: 'C1',
       autorizaTratamientoDatos: true,
+      consentimiento,
     };
 
     const dtoBasico: CreateBeneficiarioDto = {
@@ -82,13 +94,14 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
       fechaNacimiento: '1988-11-20',
       barrio: 'San Nicolás',
       autorizaTratamientoDatos: true,
+      consentimiento,
     };
 
     it('debe registrar un beneficiario con nivel EXTENDIDO exitosamente', async () => {
       mockQueryBuilder.getOne.mockResolvedValue(null);
       mockRepository.save.mockResolvedValue(crearBeneficiarioMock());
 
-      const resultado = await service.create(dtoExtendido);
+      const resultado = await service.create(dtoExtendido, 'operador');
 
       expect(resultado).toBeDefined();
       expect(resultado.numeroDocumento).toBe('1088234567');
@@ -125,7 +138,7 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
         clasificacionSocioeconomica: 'B2',
       };
 
-      const resultado = await service.create(dtoBasicoConCamposExtras);
+      const resultado = await service.create(dtoBasicoConCamposExtras, 'operador');
 
       expect(resultado).toBeDefined();
       const calledWith = mockRepository.create.mock.calls[0][0];
@@ -152,7 +165,8 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
         apellidos: 'Mora',
         fechaNacimiento: hace10Anios,
         autorizaTratamientoDatos: true,
-      });
+        consentimiento,
+      }, 'operador');
 
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -169,9 +183,10 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
         apellidos: 'Ruiz',
         fechaNacimiento: '1990-05-10',
         autorizaTratamientoDatos: true,
+        consentimiento,
       };
 
-      await expect(service.create(dtoIncompleto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dtoIncompleto, 'operador')).rejects.toThrow(BadRequestException);
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 
@@ -183,9 +198,10 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
         apellidos: 'Ruiz',
         fechaNacimiento: '1990-05-10',
         autorizaTratamientoDatos: true,
+        consentimiento,
       };
 
-      await expect(service.create(dtoIncompleto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dtoIncompleto, 'operador')).rejects.toThrow(BadRequestException);
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 
@@ -201,7 +217,7 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
         }),
       );
 
-      const resultado = await service.create(dtoBasico);
+      const resultado = await service.create(dtoBasico, 'operador');
 
       expect(resultado).toBeDefined();
       expect(mockRepository.save).toHaveBeenCalled();
@@ -210,14 +226,14 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
     it('debe rechazar duplicados de personas sin documento con los mismos nombres, fecha de nacimiento y barrio (RNF-15)', async () => {
       mockQueryBuilder.getOne.mockResolvedValue(crearBeneficiarioMock());
 
-      await expect(service.create(dtoBasico)).rejects.toThrow(ConflictException);
+      await expect(service.create(dtoBasico, 'operador')).rejects.toThrow(ConflictException);
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 
     it('debe lanzar ConflictException (409) si ya existe un beneficiario con ese documento', async () => {
       mockQueryBuilder.getOne.mockResolvedValue(crearBeneficiarioMock());
 
-      await expect(service.create(dtoExtendido)).rejects.toThrow(ConflictException);
+      await expect(service.create(dtoExtendido, 'operador')).rejects.toThrow(ConflictException);
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 
@@ -225,7 +241,7 @@ describe('BeneficiariosService (RF-01 y RF-02)', () => {
       mockQueryBuilder.getOne.mockResolvedValue(null);
       mockRepository.save.mockRejectedValue(errorDocumentoDuplicado());
 
-      await expect(service.create(dtoExtendido)).rejects.toThrow(ConflictException);
+      await expect(service.create(dtoExtendido, 'operador')).rejects.toThrow(ConflictException);
     });
   });
 

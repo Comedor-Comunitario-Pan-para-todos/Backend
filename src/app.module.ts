@@ -21,6 +21,10 @@ import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
 import { DescartesModule } from './descartes/descartes.module.js';
 import { Descarte } from './descartes/infrastructure/adapters/out/persistence/descarte.entity.js';
 
+import { ConsentimientosModule } from './consentimientos/consentimientos.module.js';
+import { consentimientoBeneficiarioSchema } from './consentimientos/infrastructure/consentimiento.schema.js';
+import { CrearConsentimientos1795368000000 } from './consentimientos/infrastructure/migrations/1795368000000-crear-consentimientos.js';
+
 @Module({
   imports: [
     // 1. Carga las variables de entorno de .env globalmente
@@ -51,8 +55,12 @@ import { Descarte } from './descartes/infrastructure/adapters/out/persistence/de
           equipoRefrigeracionSchema,
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
+          consentimientoBeneficiarioSchema,
         ],
-        migrations: [CrearCadenaFrio1795305600000],
+        migrations: [
+          CrearCadenaFrio1795305600000,
+          CrearConsentimientos1795368000000,
+        ],
         migrationsRun: true,
         synchronize: true, // Sincroniza las entidades automáticamente creando las tablas en MySQL
       }),
@@ -65,6 +73,7 @@ import { Descarte } from './descartes/infrastructure/adapters/out/persistence/de
     BeneficiariosModule,
     TurnosModule,
     CadenaFrioModule,
+    ConsentimientosModule,
     DescartesModule,
   ],
   controllers: [AppController],

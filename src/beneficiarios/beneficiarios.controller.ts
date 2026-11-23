@@ -45,8 +45,15 @@ export class BeneficiariosController {
   @ApiResponse({ status: 201, description: 'Beneficiario registrado exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos o inconsistencia en nivel extendido' })
   @ApiResponse({ status: 409, description: 'El documento o datos básicos ya están registrados' })
-  create(@Body() createBeneficiarioDto: CreateBeneficiarioDto) {
-    return this.beneficiariosService.create(createBeneficiarioDto);
+  async create(
+    @Body() createBeneficiarioDto: CreateBeneficiarioDto,
+    @Req() { user }: { user: { id: string; rol: { nombre: RolEnum } } },
+  ) {
+    const beneficiario = await this.beneficiariosService.create(createBeneficiarioDto, user.id);
+    if (user.rol.nombre === RolEnum.COORDINADORA) return beneficiario;
+
+    const { numeroDocumento: _numeroDocumento, tipoDocumento: _tipoDocumento, clasificacionSocioeconomica: _clasificacionSocioeconomica, ...respuesta } = beneficiario;
+    return respuesta;
   }
 
   @Get()
