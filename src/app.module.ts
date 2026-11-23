@@ -18,6 +18,8 @@ import {
 import { CrearCadenaFrio1795305600000 } from './cadena-frio/infrastructure/migrations/1795305600000-crear-cadena-frio.js';
 import { TurnosModule } from './turnos/turnos.module.js';
 import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
+import { DescartesModule } from './descartes/descartes.module.js';
+import { Descarte } from './descartes/infrastructure/adapters/out/persistence/descarte.entity.js';
 
 @Module({
   imports: [
@@ -45,6 +47,7 @@ import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
           Rol,
           Beneficiario,
           TurnoAtencion,
+          Descarte,
           equipoRefrigeracionSchema,
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
@@ -62,6 +65,7 @@ import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
     BeneficiariosModule,
     TurnosModule,
     CadenaFrioModule,
+    DescartesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
