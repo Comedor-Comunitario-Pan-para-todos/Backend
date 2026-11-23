@@ -18,6 +18,8 @@ import {
 import { CrearCadenaFrio1795305600000 } from './cadena-frio/infrastructure/migrations/1795305600000-crear-cadena-frio.js';
 import { TurnosModule } from './turnos/turnos.module.js';
 import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
+import { DescartesModule } from './descartes/descartes.module.js';
+import { Descarte } from './descartes/infrastructure/adapters/out/persistence/descarte.entity.js';
 
 import { ConsentimientosModule } from './consentimientos/consentimientos.module.js';
 import { consentimientoBeneficiarioSchema } from './consentimientos/infrastructure/consentimiento.schema.js';
@@ -49,6 +51,7 @@ import { CrearConsentimientos1795368000000 } from './consentimientos/infrastruct
           Rol,
           Beneficiario,
           TurnoAtencion,
+          Descarte,
           equipoRefrigeracionSchema,
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
@@ -71,6 +74,7 @@ import { CrearConsentimientos1795368000000 } from './consentimientos/infrastruct
     TurnosModule,
     CadenaFrioModule,
     ConsentimientosModule,
+    DescartesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
