@@ -15,6 +15,9 @@ describe('ConsentimientosService (RF-19)', () => {
   const service = new ConsentimientosService({
     registrar,
     buscarVigentes: vi.fn(),
+    buscarImagenesVigentes: vi.fn(),
+    revocarImagen: vi.fn(),
+    historialImagen: vi.fn(),
   });
 
   beforeEach(() => {

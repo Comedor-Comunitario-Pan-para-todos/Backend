@@ -10,8 +10,22 @@ export interface ConsentimientoRepository {
   buscarVigentes(
     beneficiarioIds: string[],
   ): Promise<ConsentimientoConOperador[]>;
-  registrar(consentimiento: ConsentimientoBeneficiario): Promise<{
-    creado: boolean;
-    consentimiento: ConsentimientoConOperador;
-  } | null>;
+  buscarImagenesVigentes(
+    beneficiarioIds: string[],
+  ): Promise<ConsentimientoConOperador[]>;
+  historialImagen(
+    beneficiarioId: string,
+  ): Promise<ConsentimientoConOperador[] | null>;
+  revocarImagen(
+    beneficiarioId: string,
+    actorId: string,
+  ): Promise<ConsentimientoConOperador | null>;
+  registrar(consentimiento: ConsentimientoBeneficiario): Promise<
+    | {
+        creado: boolean;
+        consentimiento: ConsentimientoConOperador;
+      }
+    | 'requiere-tutor'
+    | null
+  >;
 }

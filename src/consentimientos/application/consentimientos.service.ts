@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -58,6 +59,25 @@ export class ConsentimientosService {
     return this.repository.buscarVigentes(beneficiarioIds);
   }
 
+  buscarImagenesVigentes(beneficiarioIds: string[]) {
+    return this.repository.buscarImagenesVigentes(beneficiarioIds);
+  }
+
+  async historialImagen(id: string) {
+    const resultado = await this.repository.historialImagen(id);
+    if (!resultado) throw new NotFoundException('Beneficiario no encontrado');
+    return resultado;
+  }
+
+  async revocarImagen(id: string, actorId: string) {
+    const resultado = await this.repository.revocarImagen(id, actorId);
+    if (!resultado)
+      throw new NotFoundException(
+        'No existe un permiso de imagen vigente para esta ficha',
+      );
+    return resultado;
+  }
+
   async registrar(
     beneficiarioId: string,
     aceptacion: AceptacionConsentimiento,
@@ -70,6 +90,13 @@ export class ConsentimientosService {
     const resultado = await this.repository.registrar(consentimiento);
     if (!resultado) {
       throw new NotFoundException('Beneficiario no encontrado');
+    }
+    if (resultado === 'requiere-tutor') {
+      throw new ConflictException({
+        code: 'REQUIERE_TUTOR',
+        message:
+          'El uso de imagen requiere autorización expresa y verificada del tutor',
+      });
     }
     return resultado;
   }

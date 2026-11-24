@@ -6,6 +6,8 @@ import {
 import { ConsentimientoRegistradoDto } from '../../consentimientos/dto/registrar-consentimiento.dto.js';
 import { NivelRegistroEnum } from '../enums/nivel-registro.enum.js';
 
+import { ConsentimientoImagenDto } from '../../consentimientos/dto/consentimiento-imagen.dto.js';
+
 export class BeneficiarioRespuestaDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ enum: NivelRegistroEnum }) nivelRegistro: NivelRegistroEnum;
@@ -51,6 +53,14 @@ export class BeneficiarioRespuestaDto {
       'Última versión de la autorización de atención alimentaria, o null si está pendiente.',
   })
   consentimiento: ConsentimientoRegistradoDto | null;
+
+  @ApiProperty({
+    allOf: [{ $ref: getSchemaPath(ConsentimientoImagenDto) }],
+    nullable: true,
+    description:
+      'Opt-in efectivo de imagen, o null cuando la captura y publicación deben permanecer bloqueadas.',
+  })
+  consentimientoImagen: ConsentimientoImagenDto | null;
 }
 
 export class PaginacionBeneficiariosDto {

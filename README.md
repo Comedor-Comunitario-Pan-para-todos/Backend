@@ -292,3 +292,36 @@ pendiente. Cada evidencia incluye `registradoPor: { id, nombreCompleto }`
 además de `registradoPorId`. La coordinadora recibe documento, teléfono y
 clasificación. Para el voluntario esos campos se omiten en todas las
 respuestas de ficha.
+
+
+## RF-20 · Consentimiento de uso de imagen
+
+La ficha devuelve `consentimientoImagen` con la autorización efectiva o
+`null`. El frontend habilita captura o publicación de rostros identificables
+solo cuando obtiene una autorización vigente. Si la consulta falla o falta el
+permiso, mantiene el bloqueo.
+
+| Operación | Cuerpo o parámetro | Respuesta |
+|---|---|---|
+| `POST /beneficiarios/:id/consentimiento` | `{ "versionPolitica": 1, "finalidad": "USO_IMAGEN" }` | `201` con la evidencia o `200` con la autorización que ya está vigente. También admite el formato de RF-19 con `aceptado: true`, `versionTexto`, `finalidad` y `metodo`. |
+| `POST /beneficiarios/:id/consentimiento/revocacion` | `{ "finalidad": "USO_IMAGEN" }` | `200` con la evidencia revocada o `404` si no hay autorización vigente. |
+| `GET /beneficiarios/:id/consentimientos` | `?finalidad=USO_IMAGEN` | `200` con la lista del registro más reciente al más antiguo. |
+| `PUT /beneficiarios/:id/consentimiento-imagen` | `{ "autorizado": true, "versionPolitica": 1 }` o `{ "autorizado": false }` | `200` con la misma evidencia. Comparte las reglas de autorización y revocación del POST. |
+
+Todas las rutas requieren JWT de voluntario o coordinadora. La evidencia de
+imagen incluye `versionPolitica`, `createdAt`, `registradoPor`,
+`revocadoPor`, `revocadoEn` y `vigente`, además de los campos de RF-19.
+El formato abreviado y el PUT registran el método `VERBAL_CON_TESTIGO`.
+El servidor asigna operador y fechas. Las decisiones se guardan en el registro
+de RF-19 por finalidad, con una sola autorización vigente de imagen por ficha.
+Una nueva autorización después de revocar conserva el registro anterior.
+
+Los opt-in para menores devuelven `409` con `code: "REQUIERE_TUTOR"`.
+La verificación del tutor corresponde a RF-21. Las filas históricas de imagen
+creadas antes de RF-20 aparecen en el historial como inactivas, sin habilitar
+el permiso. El contrato está en `/api/docs`.
+
+La migración puede revertirse antes de registrar revocaciones. La reversión
+se detiene si el esquema anterior perdería evidencia o no admite versiones
+repetidas. La suite con MariaDB comparte el entorno temporal de RF-19 y se
+habilita con `RF19_MYSQL_E2E=1`.
