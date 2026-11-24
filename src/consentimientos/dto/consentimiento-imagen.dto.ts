@@ -96,6 +96,15 @@ export class ActualizarImagenDto {
 }
 
 export class ConsentimientoImagenDto extends ConsentimientoRegistradoDto {
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Autorización del tutor que respalda la decisión si se registró siendo menor.',
+  })
+  autorizacionTutorId: string | null;
+
   @ApiProperty({ enum: [FINALIDAD_USO_IMAGEN] })
   declare finalidad: typeof FINALIDAD_USO_IMAGEN;
 

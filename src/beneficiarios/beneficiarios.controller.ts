@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -39,11 +40,21 @@ import {
 } from './dto/beneficiario-respuesta.dto.js';
 
 import { ConsentimientoImagenDto } from '../consentimientos/dto/consentimiento-imagen.dto.js';
-import { requiereTutorParaImagen } from '../consentimientos/domain/consentimiento-imagen.js';
+import { imagenAplicaParaEdad } from '../consentimientos/domain/consentimiento-imagen.js';
+import { clasificarEdad } from './domain/edad-beneficiario.js';
+import { AutorizacionTutorService } from '../consentimientos/application/autorizacion-tutor.service.js';
+import type { AutorizacionTutorConOperadores } from '../consentimientos/domain/autorizacion-tutor.js';
+import { AutorizacionTutorRespuestaDto } from '../consentimientos/dto/autorizacion-tutor.dto.js';
 
-type SolicitudBeneficiario = { user: { rol: { nombre: RolEnum } } };
+type SolicitudBeneficiario = {
+  user: { id?: string; rol: { nombre: RolEnum } };
+};
 
-@ApiExtraModels(ConsentimientoRegistradoDto, ConsentimientoImagenDto)
+@ApiExtraModels(
+  ConsentimientoRegistradoDto,
+  ConsentimientoImagenDto,
+  AutorizacionTutorRespuestaDto,
+)
 @ApiTags('Gestión de beneficiarios (Padrón)')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -52,9 +63,12 @@ type SolicitudBeneficiario = { user: { rol: { nombre: RolEnum } } };
 @ApiResponse({ status: 403, description: 'Acceso denegado: rol no autorizado' })
 @Controller('beneficiarios')
 export class BeneficiariosController {
+  private readonly logger = new Logger(BeneficiariosController.name);
+
   constructor(
     private readonly beneficiariosService: BeneficiariosService,
     private readonly consentimientos: ConsentimientosService,
+    private readonly tutores: AutorizacionTutorService,
   ) {}
 
   @Post()
@@ -100,7 +114,7 @@ export class BeneficiariosController {
     if (grupo) datos.clasificacionSocioeconomica = grupo;
 
     const beneficiario = await this.beneficiariosService.create(datos, user.id);
-    return this.presentarFicha(beneficiario, user.rol.nombre);
+    return this.presentarFicha(beneficiario, user);
   }
 
   @Get()
@@ -119,10 +133,21 @@ export class BeneficiariosController {
   ) {
     const { data, meta } = await this.beneficiariosService.findAll(query);
     const ids = data.map(({ id }) => id);
-    const [vigentes, imagenes] = await Promise.all([
+    const [vigentes, imagenes, tutores] = await Promise.all([
       this.consentimientos.buscarVigentes(ids),
       this.consentimientos.buscarImagenesVigentes(ids),
+      this.tutores.buscarActivas(
+        data
+          .filter(
+            ({ fechaNacimiento }) =>
+              clasificarEdad(fechaNacimiento) === 'menor',
+          )
+          .map(({ id }) => id),
+      ),
     ]);
+    const tutorPorBeneficiario = new Map(
+      tutores.map((tutor) => [tutor.beneficiarioId, tutor]),
+    );
     const imagenPorBeneficiario = new Map(
       imagenes.map((imagen) => [imagen.beneficiarioId, imagen]),
     );
@@ -133,9 +158,10 @@ export class BeneficiariosController {
       data: data.map((ficha) =>
         this.proyectar(
           ficha,
-          user.rol.nombre,
+          user,
           porBeneficiario.get(ficha.id) ?? null,
           imagenPorBeneficiario.get(ficha.id) ?? null,
+          tutorPorBeneficiario.get(ficha.id) ?? null,
         ),
       ),
       meta,
@@ -161,7 +187,7 @@ export class BeneficiariosController {
     return {
       existe,
       beneficiario: beneficiario
-        ? await this.presentarFicha(beneficiario, user.rol.nombre)
+        ? await this.presentarFicha(beneficiario, user)
         : null,
     };
   }
@@ -181,7 +207,7 @@ export class BeneficiariosController {
     @Req() { user }: SolicitudBeneficiario,
   ) {
     const beneficiario = await this.beneficiariosService.findOne(id);
-    return this.presentarFicha(beneficiario, user.rol.nombre);
+    return this.presentarFicha(beneficiario, user);
   }
 
   @Patch(':id')
@@ -205,28 +231,36 @@ export class BeneficiariosController {
       id,
       updateBeneficiarioDto,
     );
-    return this.presentarFicha(beneficiario, user.rol.nombre);
+    return this.presentarFicha(beneficiario, user);
   }
 
-  private async presentarFicha(beneficiario: Beneficiario, rol: RolEnum) {
+  private async presentarFicha(
+    beneficiario: Beneficiario,
+    usuario: SolicitudBeneficiario['user'],
+  ) {
     const ids = [beneficiario.id];
-    const [[consentimiento], [imagen]] = await Promise.all([
+    const [[consentimiento], [imagen], [tutor]] = await Promise.all([
       this.consentimientos.buscarVigentes(ids),
       this.consentimientos.buscarImagenesVigentes(ids),
+      clasificarEdad(beneficiario.fechaNacimiento) === 'menor'
+        ? this.tutores.buscarActivas(ids)
+        : [],
     ]);
     return this.proyectar(
       beneficiario,
-      rol,
+      usuario,
       consentimiento ?? null,
       imagen ?? null,
+      tutor ?? null,
     );
   }
 
   private proyectar(
     beneficiario: Beneficiario,
-    rol: RolEnum,
+    usuario: SolicitudBeneficiario['user'],
     consentimiento: ConsentimientoConOperador | null,
     imagen: ConsentimientoConOperador | null,
+    tutor: AutorizacionTutorConOperadores | null,
   ) {
     const {
       tipoDocumento,
@@ -235,9 +269,32 @@ export class BeneficiariosController {
       clasificacionSocioeconomica,
       ...datos
     } = beneficiario;
+    const esMenorEdad =
+      clasificarEdad(beneficiario.fechaNacimiento) === 'menor';
+    const tutorActivo = esMenorEdad ? tutor : null;
+    const coordinadora = usuario.rol.nombre === RolEnum.COORDINADORA;
+    if (tutorActivo && coordinadora) {
+      this.logger.log({
+        evento: 'CONSULTA_DATOS_TUTOR',
+        beneficiarioId: beneficiario.id,
+        autorizacionId: tutorActivo.id,
+        usuarioId: usuario.id,
+        consultadoEn: new Date().toISOString(),
+      });
+    }
+    const autorizacionTutor =
+      tutorActivo &&
+      (coordinadora
+        ? tutorActivo
+        : {
+            id: tutorActivo.id,
+            beneficiarioId: tutorActivo.beneficiarioId,
+            estado: tutorActivo.estado,
+            fechaAprobacion: tutorActivo.fechaAprobacion,
+          });
     return {
       ...datos,
-      ...(rol === RolEnum.COORDINADORA
+      ...(coordinadora
         ? {
             tipoDocumento,
             numeroDocumento,
@@ -245,9 +302,16 @@ export class BeneficiariosController {
             clasificacionSocioeconomica,
           }
         : {}),
+      esMenorEdad,
       consentimiento,
+      autorizacionTutor,
       consentimientoImagen:
-        imagen && !requiereTutorParaImagen(beneficiario.fechaNacimiento)
+        imagen &&
+        imagenAplicaParaEdad(
+          beneficiario.fechaNacimiento,
+          imagen.autorizacionTutorId,
+          tutorActivo?.id,
+        )
           ? imagen
           : null,
     };

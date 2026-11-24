@@ -1,6 +1,7 @@
 import type { ConsentimientoBeneficiario } from './consentimiento.js';
 
 export interface ConsentimientoConOperador extends ConsentimientoBeneficiario {
+  autorizacionTutorId?: string | null;
   registradoPor: { id: string; nombreCompleto: string | null };
 }
 
@@ -20,12 +21,16 @@ export interface ConsentimientoRepository {
     beneficiarioId: string,
     actorId: string,
   ): Promise<ConsentimientoConOperador | null>;
-  registrar(consentimiento: ConsentimientoBeneficiario): Promise<
+  registrar(
+    consentimiento: ConsentimientoBeneficiario,
+    puedeAutorizarMenor: boolean,
+  ): Promise<
     | {
         creado: boolean;
         consentimiento: ConsentimientoConOperador;
       }
     | 'requiere-tutor'
+    | 'requiere-coordinadora'
     | null
   >;
 }

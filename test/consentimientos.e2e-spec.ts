@@ -19,6 +19,7 @@ import {
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard.js';
 import { BeneficiariosController } from '../src/beneficiarios/beneficiarios.controller.js';
 import { BeneficiariosService } from '../src/beneficiarios/beneficiarios.service.js';
+import { AutorizacionTutorService } from '../src/consentimientos/application/autorizacion-tutor.service.js';
 import { ConsentimientosService } from '../src/consentimientos/application/consentimientos.service.js';
 import { ConsentimientosController } from '../src/consentimientos/consentimientos.controller.js';
 import { CONSENTIMIENTO_REPOSITORY } from '../src/consentimientos/domain/consentimiento-repository.port.js';
@@ -56,6 +57,10 @@ describe('Consentimientos (HTTP)', () => {
       controllers: [ConsentimientosController, BeneficiariosController],
       providers: [
         ConsentimientosService,
+        {
+          provide: AutorizacionTutorService,
+          useValue: { buscarActivas: vi.fn().mockResolvedValue([]) },
+        },
         {
           provide: CONSENTIMIENTO_REPOSITORY,
           useValue: {
@@ -243,6 +248,8 @@ describe('Consentimientos (HTTP)', () => {
         nombres: 'Ana',
         consentimiento: null,
         consentimientoImagen: null,
+        autorizacionTutor: null,
+        esMenorEdad: false,
       });
     expect(crear).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining(alta),
@@ -258,6 +265,7 @@ describe('Consentimientos (HTTP)', () => {
       .expect(201);
     expect(registrar).toHaveBeenCalledWith(
       expect.objectContaining({ finalidad: 'USO_IMAGEN' }),
+      false,
     );
   });
 
@@ -332,6 +340,7 @@ describe('Consentimientos (HTTP)', () => {
         metodo: 'VERBAL_CON_TESTIGO',
         registradoPorId: usuarioId,
       }),
+      false,
     );
     for (const payload of [
       { autorizado: 'true' },

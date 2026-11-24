@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AutorizacionTutorService } from '../consentimientos/application/autorizacion-tutor.service.js';
 import type { ConsentimientosService } from '../consentimientos/application/consentimientos.service.js';
 import { BeneficiariosController } from './beneficiarios.controller.js';
 import { BeneficiariosService } from './beneficiarios.service.js';
@@ -21,10 +22,16 @@ describe('BeneficiariosController (RF-01, RF-02)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = mockService as any;
-    controller = new BeneficiariosController(service, {
-      buscarVigentes: vi.fn().mockResolvedValue([]),
-      buscarImagenesVigentes: vi.fn().mockResolvedValue([]),
-    } as unknown as ConsentimientosService);
+    controller = new BeneficiariosController(
+      service,
+      {
+        buscarVigentes: vi.fn().mockResolvedValue([]),
+        buscarImagenesVigentes: vi.fn().mockResolvedValue([]),
+      } as unknown as ConsentimientosService,
+      {
+        buscarActivas: vi.fn().mockResolvedValue([]),
+      } as unknown as AutorizacionTutorService,
+    );
   });
 
   it('debe registrar un beneficiario invocando al servicio', async () => {

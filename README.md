@@ -316,8 +316,7 @@ El servidor asigna operador y fechas. Las decisiones se guardan en el registro
 de RF-19 por finalidad, con una sola autorización vigente de imagen por ficha.
 Una nueva autorización después de revocar conserva el registro anterior.
 
-Los opt-in para menores devuelven `409` con `code: "REQUIERE_TUTOR"`.
-La verificación del tutor corresponde a RF-21. Las filas históricas de imagen
+Los opt-in para menores siguen las reglas de RF-21 descritas abajo. Las filas históricas de imagen
 creadas antes de RF-20 aparecen en el historial como inactivas, sin habilitar
 el permiso. El contrato está en `/api/docs`.
 
@@ -325,3 +324,38 @@ La migración puede revertirse antes de registrar revocaciones. La reversión
 se detiene si el esquema anterior perdería evidencia o no admite versiones
 repetidas. La suite con MariaDB comparte el entorno temporal de RF-19 y se
 habilita con `RF19_MYSQL_E2E=1`.
+
+## RF-21 · Protección de la imagen de menores
+
+La API calcula `esMenorEdad` usando la fecha de nacimiento y el calendario
+de Colombia. La ficha incluye `autorizacionTutor` con la autorización activa
+si el beneficiario es menor, o `null`. El voluntario recibe solo el ID,
+estado y fecha de aprobación. La coordinadora recibe también los datos del
+tutor y del personal que aprobó o revocó. El soporte firmado se guarda de
+forma privada en la base y no se incluye en las respuestas.
+
+| Operación | Contrato |
+|---|---|
+| `POST /beneficiarios/:id/autorizacion-tutor` | Solo Coordinadora. `multipart/form-data` con `nombreTutor`, `tipoDocumentoTutor` (`CC`, `CE`, `PPT`, `PASAPORTE`), `numeroDocumentoTutor`, `parentesco` (`MADRE`, `PADRE`, `ACUDIENTE`, `TUTOR_LEGAL`), `telefonoTutor` y archivo `soporte` (PDF, JPG o PNG, hasta 5 MiB). Responde `201`; `409` si la ficha es adulta o ya tiene una autorización activa; `413` si el soporte supera el límite. |
+| `POST /beneficiarios/:id/autorizacion-tutor/revocacion` | Solo Coordinadora. JSON `{ "motivo": "Retiro solicitado" }`. Responde `200` con la evidencia revocada o `404` si no hay autorización activa. |
+
+El alta del tutor registra la aprobación del soporte. Para habilitar
+`consentimientoImagen`, la coordinadora registra después el opt-in mediante
+RF-20. El servidor devuelve `403 REQUIERE_COORDINADORA` si un voluntario
+intenta autorizar la imagen de un menor y `409 REQUIERE_TUTOR` si la
+coordinadora lo solicita sin una autorización activa. Ambos roles pueden
+retirar el consentimiento de imagen. Revocar al tutor retira de forma
+atómica el permiso de imagen vinculado y conserva ambas evidencias.
+
+Al cumplir 18 años la ficha devuelve `null` en ambos permisos del tutor
+y la persona puede registrar su propia autorización de imagen. El nuevo
+registro retira el anterior si aún figura activo en el historial. La
+autorización de imagen es independiente de la entrega de alimentos. Según
+el acuerdo de la issue #68, el backend no ofrece un endpoint de fotos de
+beneficiarios.
+
+El contrato está en `/api/docs` y los casos de integración se ejecutan con
+`RF19_MYSQL_E2E=1` en la suite de consentimientos. La migración se puede
+revertir antes de guardar autorizaciones de tutor; luego se detiene para
+preservar la evidencia y evitar que el esquema previo interprete un permiso
+del tutor como un permiso del adulto.

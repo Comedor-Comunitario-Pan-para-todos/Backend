@@ -7,6 +7,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { GestionarConsentimientoImagen1795454400000 } from '../src/consentimientos/infrastructure/migrations/1795454400000-gestionar-consentimiento-imagen.js';
 import { AppModule } from '../src/app.module.js';
 import { Beneficiario } from '../src/beneficiarios/entities/beneficiario.entity.js';
 import { consentimientoBeneficiarioSchema } from '../src/consentimientos/infrastructure/consentimiento.schema.js';
@@ -366,7 +367,7 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
       it('revierte y reaplica su migración antes de registrar revocaciones', async () => {
         const runner = db.createQueryRunner();
         try {
-          await db.undoLastMigration();
+          await new GestionarConsentimientoImagen1795454400000().down(runner);
           expect(
             await runner.hasColumn(
               'consentimientos_beneficiarios',
@@ -375,7 +376,7 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
           ).toBe(false);
         } finally {
           try {
-            await db.runMigrations();
+            await new GestionarConsentimientoImagen1795454400000().up(runner);
             expect(
               await runner.hasColumn(
                 'consentimientos_beneficiarios',
@@ -505,13 +506,13 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
           .post(ruta + '/consentimiento')
           .set('Authorization', auth)
           .send({ versionPolitica: 1, finalidad: 'USO_IMAGEN' })
-          .expect(409);
-        expect(post.body.code).toBe('REQUIERE_TUTOR');
+          .expect(403);
+        expect(post.body.code).toBe('REQUIERE_COORDINADORA');
         await http
           .put(ruta + '/consentimiento-imagen')
           .set('Authorization', auth)
           .send({ autorizado: true, versionPolitica: 1 })
-          .expect(409);
+          .expect(403);
         await http
           .get(ruta + '/consentimientos')
           .query({ finalidad: 'USO_IMAGEN' })
@@ -544,6 +545,320 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
             .set('Authorization', auth)
             .send({ autorizado: true, versionPolitica: 1 })
             .expect(200);
+          expect(performance.now() - inicio).toBeLessThan(2000);
+        }
+      }, 30000);
+    });
+
+    describe('RF-21 · Autorización de tutor', () => {
+      const datosTutor = {
+        nombreTutor: 'Tutor de prueba',
+        tipoDocumentoTutor: 'CC',
+        numeroDocumentoTutor: '8899123',
+        parentesco: 'TUTOR_LEGAL',
+        telefonoTutor: '3001234567',
+      };
+      const pdf = Buffer.from('%PDF-1.4\n%%EOF');
+      let coord: Usuario;
+      let authCoord: string;
+
+      beforeAll(async () => {
+        const rol = await db
+          .getRepository(Rol)
+          .findOneByOrFail({ nombre: RolEnum.COORDINADORA });
+        coord = await db
+          .getRepository(Usuario)
+          .save({
+            email: 'rf21-coord@example.test',
+            nombreCompleto: 'Coordinadora RF21',
+            password: 'fixture',
+            rol,
+          });
+        authCoord =
+          'Bearer ' +
+          (await app!
+            .get(JwtService)
+            .signAsync({ sub: coord.id, email: coord.email }));
+      });
+
+      function registrar(
+        id: string,
+        token = authCoord,
+        archivo = pdf,
+        mime = 'application/pdf',
+      ) {
+        return http
+          .post('/beneficiarios/' + id + '/autorizacion-tutor')
+          .set('Authorization', token)
+          .field(datosTutor)
+          .attach('soporte', archivo, {
+            filename: 'soporte.pdf',
+            contentType: mime,
+          });
+      }
+
+      it('publica multipart y el campo de la ficha y permite revertir la migración antes de usarla', async () => {
+        const doc = SwaggerModule.createDocument(
+          app!,
+          new DocumentBuilder().addBearerAuth().build(),
+        );
+        const path = doc.paths['/beneficiarios/{id}/autorizacion-tutor'];
+        expect(path.post?.requestBody).toMatchObject({
+          content: { 'multipart/form-data': expect.any(Object) },
+        });
+        expect(
+          doc.paths['/beneficiarios/{id}/autorizacion-tutor/revocacion'].post
+            ?.responses,
+        ).toHaveProperty('200');
+        expect(doc.components?.schemas?.BeneficiarioRespuestaDto).toMatchObject(
+          { required: expect.arrayContaining(['autorizacionTutor']) },
+        );
+        const runner = db.createQueryRunner();
+        try {
+          await db.undoLastMigration();
+          expect(await runner.hasTable('autorizaciones_tutor')).toBe(false);
+        } finally {
+          try {
+            await db.runMigrations();
+            expect(await runner.hasTable('autorizaciones_tutor')).toBe(true);
+          } finally {
+            await runner.release();
+          }
+        }
+      });
+
+      it('exige dos pasos, protege los datos y revoca ambos permisos en la misma operación', async () => {
+        const { id } = await db
+          .getRepository(Beneficiario)
+          .save({
+            ...ficha,
+            nombres: 'RF21 Flujo',
+            fechaNacimiento: '2016-03-01',
+            esMenorEdad: false,
+          });
+        const ruta = '/beneficiarios/' + id;
+        const imagen = { versionPolitica: 1, finalidad: 'USO_IMAGEN' };
+        const inicial = await http
+          .get(ruta)
+          .set('Authorization', auth)
+          .expect(200);
+        expect(inicial.body).toMatchObject({
+          esMenorEdad: true,
+          autorizacionTutor: null,
+          consentimientoImagen: null,
+        });
+        const denegado = await http
+          .post(ruta + '/consentimiento')
+          .set('Authorization', authCoord)
+          .send(imagen)
+          .expect(409);
+        expect(denegado.body.code).toBe('REQUIERE_TUTOR');
+
+        const respuestas = await Promise.all([registrar(id), registrar(id)]);
+        expect(
+          respuestas.map(({ status }) => status).sort((a, b) => a - b),
+        ).toEqual([201, 409]);
+        const aprobacion = respuestas.find(
+          ({ status }) => status === 201,
+        )!.body;
+        expect(aprobacion).toMatchObject({
+          ...datosTutor,
+          estado: 'ACTIVA',
+          aprobadaPor: { id: coord.id, nombreCompleto: coord.nombreCompleto },
+          soporteTipoMime: 'application/pdf',
+          soporteTamanoBytes: pdf.length,
+        });
+        expect(aprobacion).not.toHaveProperty('soporte');
+        const [archivo] = await db.query(
+          'SELECT soporte FROM autorizaciones_tutor WHERE id = ?',
+          [aprobacion.id],
+        );
+        expect(archivo.soporte).toEqual(pdf);
+
+        const detalle = await http
+          .get(ruta)
+          .set('Authorization', auth)
+          .expect(200);
+        expect(detalle.body.consentimientoImagen).toBeNull();
+        expect(detalle.body.autorizacionTutor).toEqual({
+          id: aprobacion.id,
+          beneficiarioId: id,
+          estado: 'ACTIVA',
+          fechaAprobacion: aprobacion.fechaAprobacion,
+        });
+        const lista = await http
+          .get('/beneficiarios')
+          .set('Authorization', authCoord)
+          .query({ search: 'RF21 Flujo' })
+          .expect(200);
+        expect(lista.body.data[0].autorizacionTutor).toEqual(aprobacion);
+
+        await http
+          .post(ruta + '/consentimiento')
+          .set('Authorization', auth)
+          .send(imagen)
+          .expect(403);
+        await http
+          .put(ruta + '/consentimiento-imagen')
+          .set('Authorization', auth)
+          .send({ autorizado: true, versionPolitica: 1 })
+          .expect(403);
+        const habilitado = await http
+          .post(ruta + '/consentimiento')
+          .set('Authorization', authCoord)
+          .send(imagen)
+          .expect(201);
+        expect(habilitado.body).toMatchObject({
+          autorizacionTutorId: aprobacion.id,
+          vigente: true,
+        });
+        const fichaActiva = await http
+          .get(ruta)
+          .set('Authorization', auth)
+          .expect(200);
+        expect(fichaActiva.body.consentimientoImagen).toEqual(habilitado.body);
+
+        await http
+          .post(ruta + '/autorizacion-tutor/revocacion')
+          .set('Authorization', auth)
+          .send({ motivo: 'Retiro' })
+          .expect(403);
+        const baja = await http
+          .post(ruta + '/autorizacion-tutor/revocacion')
+          .set('Authorization', authCoord)
+          .send({ motivo: 'Retiro solicitado' })
+          .expect(200);
+        expect(baja.body).toMatchObject({
+          estado: 'REVOCADA',
+          motivoRevocacion: 'Retiro solicitado',
+          revocadaPorId: coord.id,
+        });
+        const bloqueada = await http
+          .get(ruta)
+          .set('Authorization', auth)
+          .expect(200);
+        expect(bloqueada.body).toMatchObject({
+          consentimientoImagen: null,
+          autorizacionTutor: null,
+        });
+        const historial = await http
+          .get(ruta + '/consentimientos')
+          .set('Authorization', auth)
+          .query({ finalidad: 'USO_IMAGEN' })
+          .expect(200);
+        expect(historial.body).toEqual([
+          expect.objectContaining({
+            id: habilitado.body.id,
+            vigente: false,
+            revocadoEn: baja.body.fechaRevocacion,
+            revocadoPor: { id: coord.id, nombreCompleto: coord.nombreCompleto },
+          }),
+        ]);
+        await registrar(id).expect(201);
+        await http
+          .get(ruta)
+          .set('Authorization', auth)
+          .expect(200)
+          .expect(({ body }) => {
+            expect(body.consentimientoImagen).toBeNull();
+          });
+      });
+
+      it('permite que el voluntario retire imagen y que un adulto registre su propio permiso', async () => {
+        const { id } = await db
+          .getRepository(Beneficiario)
+          .save({ ...ficha, fechaNacimiento: '2016-03-01' });
+        const ruta = '/beneficiarios/' + id;
+        const registro = await registrar(id).expect(201);
+        const consentimiento = { versionPolitica: 1, finalidad: 'USO_IMAGEN' };
+        await http
+          .post(ruta + '/consentimiento')
+          .set('Authorization', authCoord)
+          .send(consentimiento)
+          .expect(201);
+        await http
+          .put(ruta + '/consentimiento-imagen')
+          .set('Authorization', auth)
+          .send({ autorizado: false })
+          .expect(200);
+        const anterior = await http
+          .post(ruta + '/consentimiento')
+          .set('Authorization', authCoord)
+          .send(consentimiento)
+          .expect(201);
+        expect(anterior.body.autorizacionTutorId).toBe(registro.body.id);
+        const adulta = await http
+          .patch(ruta)
+          .set('Authorization', authCoord)
+          .send({ fechaNacimiento: '1990-01-01' })
+          .expect(200);
+        expect(adulta.body).toMatchObject({
+          esMenorEdad: false,
+          autorizacionTutor: null,
+          consentimientoImagen: null,
+        });
+
+        const propio = await http
+          .post(ruta + '/consentimiento')
+          .set('Authorization', auth)
+          .send(consentimiento)
+          .expect(201);
+        expect(propio.body.autorizacionTutorId).toBeNull();
+        expect(propio.body.id).not.toBe(anterior.body.id);
+        await http
+          .post(ruta + '/autorizacion-tutor/revocacion')
+          .set('Authorization', authCoord)
+          .send({ motivo: 'Retirar archivo anterior' })
+          .expect(200);
+        const vigente = await http
+          .get(ruta)
+          .set('Authorization', auth)
+          .expect(200);
+        expect(vigente.body.consentimientoImagen).toEqual(propio.body);
+      });
+
+      it('valida ficha, rol, multipart, tamaño y motivo', async () => {
+        const adulto = await db.getRepository(Beneficiario).save({ ...ficha });
+        const menor = await db
+          .getRepository(Beneficiario)
+          .save({ ...ficha, fechaNacimiento: '2016-03-01' });
+        await registrar(adulto.id).expect(409);
+        await registrar(randomUUID()).expect(404);
+        await registrar(menor.id, auth).expect(403);
+        await registrar(
+          menor.id,
+          authCoord,
+          Buffer.from('texto sin firma'),
+        ).expect(400);
+        await registrar(
+          menor.id,
+          authCoord,
+          Buffer.alloc(5 * 1024 * 1024 + 1),
+        ).expect(413);
+        await http
+          .post('/beneficiarios/' + menor.id + '/autorizacion-tutor')
+          .set('Authorization', authCoord)
+          .field(datosTutor)
+          .expect(400);
+        await http
+          .post('/beneficiarios/' + menor.id + '/autorizacion-tutor/revocacion')
+          .set('Authorization', authCoord)
+          .send({ motivo: '   ' })
+          .expect(400);
+        await http
+          .post('/beneficiarios/' + menor.id + '/autorizacion-tutor/revocacion')
+          .set('Authorization', authCoord)
+          .send({ motivo: 'Retiro' })
+          .expect(404);
+      });
+
+      it('registra 150 aprobaciones en una instancia con menos de dos segundos por transacción', async () => {
+        for (let indice = 0; indice < 150; indice++) {
+          const { id } = await db
+            .getRepository(Beneficiario)
+            .save({ ...ficha, fechaNacimiento: '2016-03-01' });
+          const inicio = performance.now();
+          await registrar(id).expect(201);
           expect(performance.now() - inicio).toBeLessThan(2000);
         }
       }, 30000);

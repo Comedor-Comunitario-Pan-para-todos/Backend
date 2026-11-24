@@ -47,7 +47,7 @@ import {
 } from './dto/consentimiento-imagen.dto.js';
 import { ConsentimientoRegistradoDto } from './dto/registrar-consentimiento.dto.js';
 
-type Solicitud = { user: { id: string } };
+type Solicitud = { user: { id: string; rol: { nombre: RolEnum } } };
 
 const esquemaRegistro = {
   anyOf: [
@@ -86,7 +86,7 @@ export class ConsentimientosController {
   })
   @ApiConflictResponse({
     description:
-      'REQUIERE_TUTOR si el uso de imagen está bloqueado por minoría de edad',
+      'REQUIERE_TUTOR si el menor no tiene autorización de tutor activa',
   })
   async registrar(
     @Param('id', ParseUUIDPipe) id: string,
@@ -129,6 +129,7 @@ export class ConsentimientosController {
         finalidad: dto.finalidad,
       },
       user.id,
+      user.rol.nombre === RolEnum.COORDINADORA,
     );
     if (!resultado.creado) response.status(HttpStatus.OK);
     return resultado.consentimiento;
@@ -173,7 +174,7 @@ export class ConsentimientosController {
   @ApiOkResponse({ type: ConsentimientoImagenDto })
   @ApiConflictResponse({
     description:
-      'REQUIERE_TUTOR si el uso de imagen está bloqueado por minoría de edad',
+      'REQUIERE_TUTOR si el menor no tiene autorización de tutor activa',
   })
   actualizarImagen(
     @Param('id', ParseUUIDPipe) id: string,
@@ -193,6 +194,7 @@ export class ConsentimientosController {
           finalidad: FINALIDAD_USO_IMAGEN,
         },
         user.id,
+        user.rol.nombre === RolEnum.COORDINADORA,
       )
       .then(({ consentimiento }) => consentimiento);
   }
