@@ -37,6 +37,12 @@ import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrast
 import { ExportacionesModule } from './exportaciones/exportaciones.module.js';
 import { logExportacionSchema } from './exportaciones/infrastructure/log-exportacion.schema.js';
 import { CrearLogExportaciones1795713600000 } from './exportaciones/infrastructure/migrations/1795713600000-crear-log-exportaciones.js';
+import { RetencionModule } from './retencion/retencion.module.js';
+import {
+  politicaRetencionSchema,
+  bitacoraRetencionSchema,
+} from './retencion/infrastructure/retencion.schemas.js';
+import { CrearRetencion1795627200000 } from './retencion/infrastructure/migrations/1795627200000-crear-retencion.js';
 
 @Module({
   imports: [
@@ -73,12 +79,15 @@ import { CrearLogExportaciones1795713600000 } from './exportaciones/infrastructu
           consentimientoBeneficiarioSchema,
           autorizacionTutorSchema,
           logExportacionSchema,
+          politicaRetencionSchema,
+          bitacoraRetencionSchema,
         ],
         migrations: [
           CrearCadenaFrio1795305600000,
           CrearConsentimientos1795368000000,
           GestionarConsentimientoImagen1795454400000,
           CrearAutorizacionesTutor1795540800000,
+          CrearRetencion1795627200000,
           CrearLogExportaciones1795713600000,
         ],
         migrationsRun: true,
@@ -98,6 +107,7 @@ import { CrearLogExportaciones1795713600000 } from './exportaciones/infrastructu
     ActasDescartesModule,
     ExcepcionesEntregaModule,
     ExportacionesModule,
+    RetencionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
