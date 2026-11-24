@@ -22,6 +22,8 @@ import { DescartesModule } from './descartes/descartes.module.js';
 import { Descarte } from './descartes/infrastructure/adapters/out/persistence/descarte.entity.js';
 import { ActasDescartesModule } from './actas-descarte/actas-descarte.module.js';
 import { ActaDescarte } from './actas-descarte/infrastructure/adapters/out/persistence/acta-descarte.entity.js';
+import { ExcepcionesEntregaModule } from './excepciones-entrega/excepciones-entrega.module.js';
+import { ExcepcionEntrega } from './excepciones-entrega/entities/excepcion-entrega.entity.js';
 
 import { ConsentimientosModule } from './consentimientos/consentimientos.module.js';
 import { consentimientoBeneficiarioSchema } from './consentimientos/infrastructure/consentimiento.schema.js';
@@ -60,6 +62,7 @@ import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrast
           TurnoAtencion,
           Descarte,
           ActaDescarte,
+          ExcepcionEntrega,
           equipoRefrigeracionSchema,
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
@@ -87,6 +90,7 @@ import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrast
     ConsentimientosModule,
     DescartesModule,
     ActasDescartesModule,
+    ExcepcionesEntregaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
