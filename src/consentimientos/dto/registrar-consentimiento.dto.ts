@@ -1,8 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { Equals, IsEnum, IsInt, Min, Max } from 'class-validator';
+import { Equals, IsEnum, IsIn, IsInt, Min, Max } from 'class-validator';
 import {
-  FINALIDAD_CONSENTIMIENTO,
+  FINALIDADES_CONSENTIMIENTO,
+  type FinalidadConsentimiento,
   MetodoConsentimiento,
   type AceptacionConsentimiento,
 } from '../domain/consentimiento.js';
@@ -20,13 +21,25 @@ export class RegistrarConsentimientoDto implements AceptacionConsentimiento {
   @Max(2147483647)
   versionTexto: number;
 
-  @ApiProperty({ enum: [FINALIDAD_CONSENTIMIENTO] })
-  @Equals(FINALIDAD_CONSENTIMIENTO)
-  finalidad: typeof FINALIDAD_CONSENTIMIENTO;
+  @ApiProperty({ enum: [...FINALIDADES_CONSENTIMIENTO] })
+  @IsIn(FINALIDADES_CONSENTIMIENTO)
+  finalidad: FinalidadConsentimiento;
 
-  @ApiProperty({ enum: MetodoConsentimiento })
+  @ApiProperty({
+    enum: MetodoConsentimiento,
+    description:
+      'Método declarado, obligatorio y sin valor por defecto. Solo se registra el método; no se reciben ni almacenan firmas, huellas o documentos.',
+  })
   @IsEnum(MetodoConsentimiento)
   metodo: MetodoConsentimiento;
+}
+
+export class OperadorConsentimientoDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  nombreCompleto: string | null;
 }
 
 export class ConsentimientoRegistradoDto extends RegistrarConsentimientoDto {
@@ -38,6 +51,9 @@ export class ConsentimientoRegistradoDto extends RegistrarConsentimientoDto {
 
   @ApiProperty({ format: 'uuid' })
   registradoPorId: string;
+
+  @ApiProperty({ type: OperadorConsentimientoDto })
+  registradoPor: OperadorConsentimientoDto;
 
   @ApiProperty({ type: String, format: 'date-time' })
   registradoEn: Date;

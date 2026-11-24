@@ -10,7 +10,7 @@ import {
 } from '../domain/consentimiento-repository.port.js';
 import { randomUUID } from 'node:crypto';
 import {
-  FINALIDAD_CONSENTIMIENTO,
+  FINALIDADES_CONSENTIMIENTO,
   MetodoConsentimiento,
   type AceptacionConsentimiento,
   type ConsentimientoBeneficiario,
@@ -30,7 +30,7 @@ export function prepararConsentimiento(
     !Number.isInteger(aceptacion.versionTexto) ||
     aceptacion.versionTexto < 1 ||
     aceptacion.versionTexto > 2147483647 ||
-    aceptacion.finalidad !== FINALIDAD_CONSENTIMIENTO ||
+    !FINALIDADES_CONSENTIMIENTO.includes(aceptacion.finalidad) ||
     !Object.values(MetodoConsentimiento).includes(aceptacion.metodo)
   ) {
     throw new BadRequestException('Los datos del consentimiento son inválidos');
@@ -53,6 +53,10 @@ export class ConsentimientosService {
     @Inject(CONSENTIMIENTO_REPOSITORY)
     private readonly repository: ConsentimientoRepository,
   ) {}
+
+  buscarVigentes(beneficiarioIds: string[]) {
+    return this.repository.buscarVigentes(beneficiarioIds);
+  }
 
   async registrar(
     beneficiarioId: string,

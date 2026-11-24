@@ -12,7 +12,10 @@ const aceptacion = {
 
 describe('ConsentimientosService (RF-19)', () => {
   const registrar = vi.fn();
-  const service = new ConsentimientosService({ registrar });
+  const service = new ConsentimientosService({
+    registrar,
+    buscarVigentes: vi.fn(),
+  });
 
   beforeEach(() => {
     registrar.mockReset();

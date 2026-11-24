@@ -272,3 +272,23 @@ El contrato está en `/api/docs`. La migración se aplica al iniciar el backend.
 La suite HTTP se ejecuta con `npm run test:e2e -- consentimientos.e2e-spec.ts`.
 La suite `consentimientos.mysql.e2e-spec.ts` se habilita con
 `RF19_MYSQL_E2E=1` y usa una base local temporal.
+
+
+### Contrato de ficha y finalidades
+
+El alta admite también `nivel` como alias de `nivelRegistro`, y
+`clasificacion: { sistema, grupo }` como alternativa a
+`clasificacionSocioeconomica`. Para Sisbén (`SISBEN` o `SISBEN_IV`) se
+guarda el grupo normalizado. Para `RUI` se guarda `RUI`. Si se envían
+ambos formatos, deben coincidir.
+
+`metodo` es obligatorio y se registra como texto, sin adjuntos. La ruta de
+consentimiento admite `ATENCION_ALIMENTARIA` y `USO_IMAGEN`. El alta requiere
+`ATENCION_ALIMENTARIA`; el consentimiento de imagen se registra por separado.
+
+Las respuestas que incluyen una ficha devuelven `consentimiento` con la
+última versión registrada de atención alimentaria, o `null` si está
+pendiente. Cada evidencia incluye `registradoPor: { id, nombreCompleto }`
+además de `registradoPorId`. La coordinadora recibe documento, teléfono y
+clasificación. Para el voluntario esos campos se omiten en todas las
+respuestas de ficha.

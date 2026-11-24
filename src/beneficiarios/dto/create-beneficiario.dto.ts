@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   Equals,
+
   IsDefined,
   IsObject,
   ValidateNested,
@@ -17,6 +18,15 @@ import { NivelRegistroEnum } from '../enums/nivel-registro.enum.js';
 
 import { RegistrarConsentimientoDto } from '../../consentimientos/dto/registrar-consentimiento.dto.js';
 
+import { FINALIDAD_CONSENTIMIENTO } from '../../consentimientos/domain/consentimiento.js';
+import { ClasificacionBeneficiarioDto } from './clasificacion-beneficiario.dto.js';
+
+class ConsentimientoAltaDto extends RegistrarConsentimientoDto {
+  @ApiProperty({ enum: [FINALIDAD_CONSENTIMIENTO] })
+  @Equals(FINALIDAD_CONSENTIMIENTO)
+  declare finalidad: typeof FINALIDAD_CONSENTIMIENTO;
+}
+
 export class CreateBeneficiarioDto {
   @ApiPropertyOptional({
     enum: NivelRegistroEnum,
@@ -27,7 +37,19 @@ export class CreateBeneficiarioDto {
   @IsEnum(NivelRegistroEnum, {
     message: 'El nivel de registro debe ser BASICO o EXTENDIDO',
   })
-  nivelRegistro?: NivelRegistroEnum = NivelRegistroEnum.BASICO;
+  nivelRegistro?: NivelRegistroEnum;
+
+  @ApiPropertyOptional({ enum: NivelRegistroEnum, description: 'Alias de nivelRegistro para el alta' })
+  @IsOptional()
+  @IsEnum(NivelRegistroEnum)
+  nivel?: NivelRegistroEnum;
+
+  @ApiPropertyOptional({ type: ClasificacionBeneficiarioDto, description: 'Alternativa estructurada a clasificacionSocioeconomica' })
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ClasificacionBeneficiarioDto)
+  clasificacion?: ClasificacionBeneficiarioDto;
 
   @ApiPropertyOptional({ example: 'CC', description: 'Tipo de documento (CC, TI, RC, PPT)' })
   @IsOptional()
@@ -97,10 +119,10 @@ export class CreateBeneficiarioDto {
   @Equals(true, { message: 'La autorización de datos debe ser explícita' })
   autorizaTratamientoDatos: boolean;
 
-  @ApiProperty({ type: RegistrarConsentimientoDto })
+  @ApiProperty({ type: ConsentimientoAltaDto })
   @IsDefined()
   @IsObject()
   @ValidateNested()
-  @Type(() => RegistrarConsentimientoDto)
-  consentimiento: RegistrarConsentimientoDto;
+  @Type(() => ConsentimientoAltaDto)
+  consentimiento: ConsentimientoAltaDto;
 }
