@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In, type EntityManager } from 'typeorm';
+import { DataSource, In, IsNull, type EntityManager } from 'typeorm';
 import { Beneficiario } from '../../beneficiarios/entities/beneficiario.entity.js';
 import { Usuario } from '../../usuarios/entities/usuario.entity.js';
 import type { ConsentimientoRepository } from '../domain/consentimiento-repository.port.js';
@@ -16,6 +16,7 @@ import {
 import {
   FINALIDAD_CONSENTIMIENTO,
   FINALIDAD_USO_IMAGEN,
+  FINALIDAD_REPORTE_ALCALDIA,
   type ConsentimientoBeneficiario,
 } from '../domain/consentimiento.js';
 import {
@@ -70,16 +71,18 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
       } else {
         const existente = await manager.findOneBy(
           consentimientoBeneficiarioSchema,
-          { beneficiarioId, finalidad, versionTexto },
+          { beneficiarioId, finalidad, versionTexto, revocadoEn: IsNull() },
         );
         if (existente) {
           const [evidencia] = await this.conOperadores(manager, [existente]);
           return { creado: false, consentimiento: evidencia };
         }
         await manager.insert(consentimientoBeneficiarioSchema, consentimiento);
-        await manager.update(Beneficiario, beneficiarioId, {
-          autorizaTratamientoDatos: true,
-        });
+        if (finalidad === FINALIDAD_CONSENTIMIENTO) {
+          await manager.update(Beneficiario, beneficiarioId, {
+            autorizaTratamientoDatos: true,
+          });
+        }
       }
 
       const [evidencia] = await this.conOperadores(manager, [
@@ -90,6 +93,28 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
         },
       ]);
       return { creado: true, consentimiento: evidencia };
+    });
+  }
+
+  async revocarReporteAlcaldia(beneficiarioId: string, revocadoPorId: string) {
+    return this.dataSource.transaction(async (manager) => {
+      if (!(await bloquearFicha(manager, beneficiarioId))) return null;
+      const where = {
+        beneficiarioId,
+        finalidad: FINALIDAD_REPORTE_ALCALDIA,
+        revocadoEn: IsNull(),
+      } as const;
+      const vigente = await manager.findOne(consentimientoBeneficiarioSchema, {
+        where,
+        order: { versionTexto: 'DESC' },
+      });
+      if (!vigente) return null;
+      const cambios = { revocadoPorId, revocadoEn: new Date() };
+      await manager.update(consentimientoBeneficiarioSchema, where, cambios);
+      const [evidencia] = await this.conOperadores(manager, [
+        { ...vigente, ...cambios },
+      ]);
+      return evidencia;
     });
   }
 
@@ -221,7 +246,12 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
               revocadoEn: revocadoEn ?? null,
               vigente: _activa === true,
             }
-          : {}),
+          : consentimiento.finalidad === FINALIDAD_REPORTE_ALCALDIA
+            ? {
+                revocadoPor: revocadoPorId ? operador(revocadoPorId) : null,
+                revocadoEn: revocadoEn ?? null,
+              }
+            : {}),
       }),
     );
   }

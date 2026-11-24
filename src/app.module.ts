@@ -34,6 +34,10 @@ import { GestionarConsentimientoImagen1795454400000 } from './consentimientos/in
 import { autorizacionTutorSchema } from './consentimientos/infrastructure/autorizacion-tutor.schema.js';
 import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrastructure/migrations/1795540800000-crear-autorizaciones-tutor.js';
 
+import { ExportacionesModule } from './exportaciones/exportaciones.module.js';
+import { logExportacionSchema } from './exportaciones/infrastructure/log-exportacion.schema.js';
+import { CrearLogExportaciones1795713600000 } from './exportaciones/infrastructure/migrations/1795713600000-crear-log-exportaciones.js';
+
 @Module({
   imports: [
     // 1. Carga las variables de entorno de .env globalmente
@@ -68,12 +72,14 @@ import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrast
           accesoCatalogoSchema,
           consentimientoBeneficiarioSchema,
           autorizacionTutorSchema,
+          logExportacionSchema,
         ],
         migrations: [
           CrearCadenaFrio1795305600000,
           CrearConsentimientos1795368000000,
           GestionarConsentimientoImagen1795454400000,
           CrearAutorizacionesTutor1795540800000,
+          CrearLogExportaciones1795713600000,
         ],
         migrationsRun: true,
         synchronize: true, // Sincroniza las entidades automáticamente creando las tablas en MySQL
@@ -91,6 +97,7 @@ import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrast
     DescartesModule,
     ActasDescartesModule,
     ExcepcionesEntregaModule,
+    ExportacionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

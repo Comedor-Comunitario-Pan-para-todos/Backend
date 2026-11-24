@@ -21,6 +21,10 @@ export interface ConsentimientoRepository {
     beneficiarioId: string,
     actorId: string,
   ): Promise<ConsentimientoConOperador | null>;
+  revocarReporteAlcaldia(
+    beneficiarioId: string,
+    actorId: string,
+  ): Promise<ConsentimientoConOperador | null>;
   registrar(
     consentimiento: ConsentimientoBeneficiario,
     puedeAutorizarMenor: boolean,

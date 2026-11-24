@@ -6,6 +6,7 @@ import {
 } from '@nestjs/swagger';
 import {
   Equals,
+  IsIn,
   IsBoolean,
   IsEnum,
   IsInt,
@@ -15,6 +16,7 @@ import {
 } from 'class-validator';
 import {
   FINALIDAD_USO_IMAGEN,
+  FINALIDAD_REPORTE_ALCALDIA,
   MetodoConsentimiento,
 } from '../domain/consentimiento.js';
 import {
@@ -73,6 +75,24 @@ export class RevocarImagenDto {
 }
 
 export class HistorialImagenQueryDto extends RevocarImagenDto {}
+
+export class RevocarConsentimientoDto {
+  @ApiProperty({ enum: [FINALIDAD_USO_IMAGEN, FINALIDAD_REPORTE_ALCALDIA] })
+  @IsIn([FINALIDAD_USO_IMAGEN, FINALIDAD_REPORTE_ALCALDIA])
+  finalidad: typeof FINALIDAD_USO_IMAGEN | typeof FINALIDAD_REPORTE_ALCALDIA;
+}
+
+export class ConsentimientoReporteDto extends ConsentimientoRegistradoDto {
+  @ApiProperty({ enum: [FINALIDAD_REPORTE_ALCALDIA] })
+  declare finalidad: typeof FINALIDAD_REPORTE_ALCALDIA;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  revocadoEn: Date | null;
+  @ApiProperty({
+    allOf: [{ $ref: getSchemaPath(OperadorConsentimientoDto) }],
+    nullable: true,
+  })
+  revocadoPor: OperadorConsentimientoDto | null;
+}
 
 export class ActualizarImagenDto {
   @ApiProperty({ type: Boolean })

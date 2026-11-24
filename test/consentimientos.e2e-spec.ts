@@ -157,7 +157,7 @@ describe('Consentimientos (HTTP)', () => {
     { versionTexto: 1.5 },
     { versionTexto: 2147483648 },
     { finalidad: '' },
-    { finalidad: 'REPORTE_ALCALDIA' },
+    { finalidad: 'REPORTE_NO_VALIDO' },
     { metodo: 'OTRO' },
     { metodo: undefined },
     { registradoPorId: 'otro' },

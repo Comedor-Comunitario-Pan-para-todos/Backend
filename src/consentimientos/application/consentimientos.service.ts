@@ -79,6 +79,15 @@ export class ConsentimientosService {
     return resultado;
   }
 
+  async revocarReporteAlcaldia(id: string, actorId: string) {
+    const evidencia = await this.repository.revocarReporteAlcaldia(id, actorId);
+    if (!evidencia)
+      throw new NotFoundException(
+        'La ficha no tiene consentimiento vigente para el reporte',
+      );
+    return evidencia;
+  }
+
   async registrar(
     beneficiarioId: string,
     aceptacion: AceptacionConsentimiento,

@@ -36,6 +36,7 @@ import { RolEnum } from '../usuarios/enums/rol.enum.js';
 import { ConsentimientosService } from './application/consentimientos.service.js';
 import {
   FINALIDAD_USO_IMAGEN,
+  FINALIDAD_REPORTE_ALCALDIA,
   MetodoConsentimiento,
 } from './domain/consentimiento.js';
 import {
@@ -43,7 +44,8 @@ import {
   ConsentimientoImagenDto,
   HistorialImagenQueryDto,
   RegistrarSolicitudConsentimientoDto,
-  RevocarImagenDto,
+  RevocarConsentimientoDto,
+  ConsentimientoReporteDto,
 } from './dto/consentimiento-imagen.dto.js';
 import { ConsentimientoRegistradoDto } from './dto/registrar-consentimiento.dto.js';
 
@@ -53,12 +55,17 @@ const esquemaRegistro = {
   anyOf: [
     { $ref: getSchemaPath(ConsentimientoRegistradoDto) },
     { $ref: getSchemaPath(ConsentimientoImagenDto) },
+    { $ref: getSchemaPath(ConsentimientoReporteDto) },
   ],
 };
 
 @ApiTags('Consentimientos')
 @ApiBearerAuth()
-@ApiExtraModels(ConsentimientoRegistradoDto, ConsentimientoImagenDto)
+@ApiExtraModels(
+  ConsentimientoRegistradoDto,
+  ConsentimientoImagenDto,
+  ConsentimientoReporteDto,
+)
 @ApiUnauthorizedResponse()
 @ApiForbiddenResponse()
 @ApiBadRequestResponse()
@@ -77,7 +84,7 @@ export class ConsentimientosController {
   @Post('consentimiento')
   @ApiOperation({
     summary:
-      'Registrar consentimiento informado o autorizar uso de imagen (RF-19, RF-20)',
+      'Registrar consentimiento para alimentación, imagen o reporte a la Alcaldía',
   })
   @ApiCreatedResponse({ schema: esquemaRegistro })
   @ApiOkResponse({
@@ -138,15 +145,17 @@ export class ConsentimientosController {
   @Post('consentimiento/revocacion')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Revocar el permiso vigente de uso de imagen (RF-20)',
+    summary: 'Revocar el consentimiento de imagen o reporte a la Alcaldía',
   })
-  @ApiOkResponse({ type: ConsentimientoImagenDto })
+  @ApiOkResponse({ schema: esquemaRegistro })
   revocar(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() _dto: RevocarImagenDto,
+    @Body() dto: RevocarConsentimientoDto,
     @Req() { user }: Solicitud,
   ) {
-    return this.service.revocarImagen(id, user.id);
+    return dto.finalidad === FINALIDAD_REPORTE_ALCALDIA
+      ? this.service.revocarReporteAlcaldia(id, user.id)
+      : this.service.revocarImagen(id, user.id);
   }
 
   @Get('consentimientos')

@@ -359,3 +359,41 @@ El contrato está en `/api/docs` y los casos de integración se ejecutan con
 revertir antes de guardar autorizaciones de tutor; luego se detiene para
 preservar la evidencia y evitar que el esquema previo interprete un permiso
 del tutor como un permiso del adulto.
+
+## RF-18 · Exportación de padrón a Excel
+
+`GET /exportaciones/beneficiarios.xlsx` requiere JWT de `PRESIDENTE_JAC`.
+Devuelve el binario OOXML con
+`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+`Content-Disposition: attachment; filename="beneficiarios.xlsx"` y
+`Cache-Control: no-store`. El frontend debe leer el cuerpo como Blob.
+Una exportación sin resultados devuelve un libro con sus encabezados.
+
+Se admiten `desde` y `hasta` opcionales en formato `AAAA-MM-DD`, inclusivos
+y en horario colombiano. El filtro aplica a la fecha en que se registró el
+consentimiento vigente para Alcaldía. Fecha inválida, rango invertido o
+parámetro desconocido producen `400`; falta de autenticación, `401`; otro
+rol, `403`.
+
+Para registrar consentimiento desde la ficha, Voluntario o Coordinadora
+envían a `POST /beneficiarios/:id/consentimiento`:
+
+```json
+{
+  "aceptado": true,
+  "versionTexto": 1,
+  "finalidad": "REPORTE_ALCALDIA",
+  "metodo": "VERBAL_CON_TESTIGO"
+}
+```
+
+La revocación se hace con `POST /beneficiarios/:id/consentimiento/revocacion`
+y `{ "finalidad": "REPORTE_ALCALDIA" }`. Retira todos los permisos vigentes
+de esa finalidad. Se exportan solo fichas activas con autorización vigente
+y se registra el ID del operador, la fecha, los filtros y el número de filas.
+Si falla la auditoría, no se entrega el archivo.
+
+La hoja provisional incluye únicamente `Nombres` y `Apellidos`. El esquema
+oficial de la Alcaldía de Pereira sigue pendiente de confirmación. El
+contrato está en `/api/docs`. Para la integración con MariaDB local, habilitar
+`RF18_MYSQL_E2E=1`; la suite crea y elimina una base temporal.
