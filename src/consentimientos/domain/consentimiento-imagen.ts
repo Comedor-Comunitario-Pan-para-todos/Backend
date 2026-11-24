@@ -1,16 +1,13 @@
-const calendarioBogota = new Intl.DateTimeFormat('sv-SE', {
-  timeZone: 'America/Bogota',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
+import { clasificarEdad } from '../../beneficiarios/domain/edad-beneficiario.js';
 
-export function requiereTutorParaImagen(fechaNacimiento: string): boolean {
-  const hoy = calendarioBogota.format(new Date());
-  const limite = String(Number(hoy.slice(0, 4)) - 18) + hoy.slice(4);
+export function imagenAplicaParaEdad(
+  fechaNacimiento: string,
+  autorizacionTutorId: string | null | undefined,
+  tutorActivoId?: string,
+): boolean {
+  const edad = clasificarEdad(fechaNacimiento);
+  if (edad === 'adulto') return !autorizacionTutorId;
   return (
-    !/^\d{4}-\d{2}-\d{2}$/.test(fechaNacimiento) ||
-    !Number.isFinite(Date.parse(fechaNacimiento)) ||
-    fechaNacimiento > limite
+    edad === 'menor' && !!tutorActivoId && autorizacionTutorId === tutorActivoId
   );
 }

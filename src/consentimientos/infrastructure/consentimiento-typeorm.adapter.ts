@@ -4,7 +4,15 @@ import { DataSource, In, type EntityManager } from 'typeorm';
 import { Beneficiario } from '../../beneficiarios/entities/beneficiario.entity.js';
 import { Usuario } from '../../usuarios/entities/usuario.entity.js';
 import type { ConsentimientoRepository } from '../domain/consentimiento-repository.port.js';
-import { requiereTutorParaImagen } from '../domain/consentimiento-imagen.js';
+import { imagenAplicaParaEdad } from '../domain/consentimiento-imagen.js';
+import { clasificarEdad } from '../../beneficiarios/domain/edad-beneficiario.js';
+import { EstadoAutorizacionTutor } from '../domain/autorizacion-tutor.js';
+import { autorizacionTutorSchema } from './autorizacion-tutor.schema.js';
+import {
+  bloquearFicha,
+  buscarImagenActiva,
+  retirarImagen,
+} from './imagen-transaccion.js';
 import {
   FINALIDAD_CONSENTIMIENTO,
   FINALIDAD_USO_IMAGEN,
@@ -19,26 +27,44 @@ import {
 export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
-  async registrar(consentimiento: ConsentimientoBeneficiario) {
+  async registrar(
+    consentimiento: ConsentimientoBeneficiario,
+    puedeAutorizarMenor: boolean,
+  ) {
     const { beneficiarioId, finalidad, versionTexto } = consentimiento;
     return this.dataSource.transaction(async (manager) => {
-      const ficha = await this.bloquearFicha(manager, beneficiarioId);
+      const ficha = await bloquearFicha(manager, beneficiarioId);
       if (!ficha) return null;
 
+      let autorizacionTutorId: string | null = null;
       if (finalidad === FINALIDAD_USO_IMAGEN) {
-        if (requiereTutorParaImagen(ficha.fechaNacimiento))
-          return 'requiere-tutor' as const;
-
-        const vigente = await manager.findOneBy(
-          consentimientoBeneficiarioSchema,
-          { beneficiarioId, finalidad, activaImagen: true },
-        );
-        if (vigente) {
+        const edad = clasificarEdad(ficha.fechaNacimiento);
+        if (edad !== 'adulto') {
+          if (!puedeAutorizarMenor) return 'requiere-coordinadora' as const;
+          const tutor =
+            edad === 'menor'
+              ? await this.buscarTutorActivo(manager, beneficiarioId)
+              : null;
+          if (!tutor) return 'requiere-tutor' as const;
+          autorizacionTutorId = tutor.id;
+        }
+        const vigente = await buscarImagenActiva(manager, beneficiarioId);
+        if (
+          vigente &&
+          imagenAplicaParaEdad(
+            ficha.fechaNacimiento,
+            vigente.autorizacionTutorId,
+            autorizacionTutorId ?? undefined,
+          )
+        ) {
           const [evidencia] = await this.conOperadores(manager, [vigente]);
           return { creado: false, consentimiento: evidencia };
         }
+        if (vigente)
+          await retirarImagen(manager, vigente, consentimiento.registradoPorId);
         await manager.insert(consentimientoBeneficiarioSchema, {
           ...consentimiento,
+          autorizacionTutorId,
           activaImagen: true,
         });
       } else {
@@ -60,6 +86,7 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
         {
           ...consentimiento,
           activaImagen: finalidad === FINALIDAD_USO_IMAGEN ? true : null,
+          autorizacionTutorId,
         },
       ]);
       return { creado: true, consentimiento: evidencia };
@@ -68,30 +95,12 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
 
   async revocarImagen(beneficiarioId: string, revocadoPorId: string) {
     return this.dataSource.transaction(async (manager) => {
-      if (!(await this.bloquearFicha(manager, beneficiarioId))) return null;
-      const vigente = await manager.findOneBy(
-        consentimientoBeneficiarioSchema,
-        {
-          beneficiarioId,
-          finalidad: FINALIDAD_USO_IMAGEN,
-          activaImagen: true,
-        },
-      );
+      if (!(await bloquearFicha(manager, beneficiarioId))) return null;
+      const vigente = await buscarImagenActiva(manager, beneficiarioId);
       if (!vigente) return null;
 
-      const actualizacion = {
-        activaImagen: null,
-        revocadoPorId,
-        revocadoEn: new Date(),
-      };
-      await manager.update(
-        consentimientoBeneficiarioSchema,
-        vigente.id,
-        actualizacion,
-      );
-      const [evidencia] = await this.conOperadores(manager, [
-        { ...vigente, ...actualizacion },
-      ]);
+      const revocado = await retirarImagen(manager, vigente, revocadoPorId);
+      const [evidencia] = await this.conOperadores(manager, [revocado]);
       return evidencia;
     });
   }
@@ -108,9 +117,19 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
         .where({ beneficiarioId, finalidad: FINALIDAD_USO_IMAGEN })
         .orderBy('historial.ordenConsentimiento', 'DESC')
         .getMany();
-      const verificables = requiereTutorParaImagen(ficha.fechaNacimiento)
-        ? registros.map((registro) => ({ ...registro, activaImagen: null }))
-        : registros;
+      const tutor =
+        clasificarEdad(ficha.fechaNacimiento) === 'menor'
+          ? await this.buscarTutorActivo(manager, beneficiarioId)
+          : null;
+      const verificables = registros.map((registro) =>
+        imagenAplicaParaEdad(
+          ficha.fechaNacimiento,
+          registro.autorizacionTutorId,
+          tutor?.id,
+        )
+          ? registro
+          : { ...registro, activaImagen: null },
+      );
       return this.conOperadores(manager, verificables);
     });
   }
@@ -153,11 +172,10 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
     return this.conOperadores(this.dataSource.manager, vigentes);
   }
 
-  private bloquearFicha(manager: EntityManager, id: string) {
-    return manager.findOne(Beneficiario, {
-      select: { id: true, fechaNacimiento: true },
-      where: { id },
-      lock: { mode: 'pessimistic_write' },
+  private buscarTutorActivo(manager: EntityManager, beneficiarioId: string) {
+    return manager.findOne(autorizacionTutorSchema, {
+      select: { id: true },
+      where: { beneficiarioId, estado: EstadoAutorizacionTutor.ACTIVA },
     });
   }
 
@@ -187,6 +205,7 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
     return consentimientos.map(
       ({
         activaImagen: _activa,
+        autorizacionTutorId,
         revocadoPorId,
         revocadoEn,
         ...consentimiento
@@ -195,6 +214,7 @@ export class ConsentimientoTypeOrmAdapter implements ConsentimientoRepository {
         registradoPor: operador(consentimiento.registradoPorId),
         ...(consentimiento.finalidad === FINALIDAD_USO_IMAGEN
           ? {
+              autorizacionTutorId: autorizacionTutorId ?? null,
               versionPolitica: consentimiento.versionTexto,
               createdAt: consentimiento.registradoEn,
               revocadoPor: revocadoPorId ? operador(revocadoPorId) : null,

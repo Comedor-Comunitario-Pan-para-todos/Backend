@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -82,14 +83,25 @@ export class ConsentimientosService {
     beneficiarioId: string,
     aceptacion: AceptacionConsentimiento,
     usuarioId: string,
+    puedeAutorizarMenor = false,
   ) {
     const consentimiento: ConsentimientoBeneficiario = {
       beneficiarioId,
       ...prepararConsentimiento(aceptacion, usuarioId),
     };
-    const resultado = await this.repository.registrar(consentimiento);
+    const resultado = await this.repository.registrar(
+      consentimiento,
+      puedeAutorizarMenor,
+    );
     if (!resultado) {
       throw new NotFoundException('Beneficiario no encontrado');
+    }
+    if (resultado === 'requiere-coordinadora') {
+      throw new ForbiddenException({
+        code: 'REQUIERE_COORDINADORA',
+        message:
+          'Solo la Coordinadora puede autorizar el uso de imagen de un menor',
+      });
     }
     if (resultado === 'requiere-tutor') {
       throw new ConflictException({

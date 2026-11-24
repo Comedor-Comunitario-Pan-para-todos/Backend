@@ -8,6 +8,8 @@ import { NivelRegistroEnum } from '../enums/nivel-registro.enum.js';
 
 import { ConsentimientoImagenDto } from '../../consentimientos/dto/consentimiento-imagen.dto.js';
 
+import { AutorizacionTutorRespuestaDto } from '../../consentimientos/dto/autorizacion-tutor.dto.js';
+
 export class BeneficiarioRespuestaDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ enum: NivelRegistroEnum }) nivelRegistro: NivelRegistroEnum;
@@ -61,6 +63,14 @@ export class BeneficiarioRespuestaDto {
       'Opt-in efectivo de imagen, o null cuando la captura y publicación deben permanecer bloqueadas.',
   })
   consentimientoImagen: ConsentimientoImagenDto | null;
+
+  @ApiProperty({
+    allOf: [{ $ref: getSchemaPath(AutorizacionTutorRespuestaDto) }],
+    nullable: true,
+    description:
+      'Autorización activa de un menor, con datos personales visibles solo para Coordinadora.',
+  })
+  autorizacionTutor: AutorizacionTutorRespuestaDto | null;
 }
 
 export class PaginacionBeneficiariosDto {

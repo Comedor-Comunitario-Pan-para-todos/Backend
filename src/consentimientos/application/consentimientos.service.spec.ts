@@ -46,7 +46,7 @@ describe('ConsentimientosService (RF-19)', () => {
       registradoEn: expect.any(Date),
     });
     expect(resultado.registradoEn.getTime()).toBeGreaterThan(0);
-    expect(registrar).toHaveBeenCalledExactlyOnceWith(resultado);
+    expect(registrar).toHaveBeenCalledExactlyOnceWith(resultado, false);
   });
 
   it('rechaza la negativa sin iniciar ninguna escritura', async () => {

@@ -6,6 +6,7 @@ import {
 
 export interface ConsentimientoPersistido extends ConsentimientoBeneficiario {
   activaImagen?: boolean | null;
+  autorizacionTutorId?: string | null;
   revocadoPorId?: string | null;
   revocadoEn?: Date | null;
 }
@@ -18,6 +19,7 @@ export const consentimientoBeneficiarioSchema =
     // Los índices de unicidad por finalidad los administra la migración.
     columns: {
       activaImagen: { type: 'boolean', nullable: true },
+      autorizacionTutorId: { type: 'varchar', length: 36, nullable: true },
       revocadoPorId: { type: 'varchar', length: 36, nullable: true },
       revocadoEn: { type: 'datetime', precision: 3, nullable: true },
       id: { type: 'varchar', length: 36, primary: true },

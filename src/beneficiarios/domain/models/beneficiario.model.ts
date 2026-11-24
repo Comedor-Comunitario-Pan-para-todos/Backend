@@ -1,3 +1,4 @@
+import { clasificarEdad } from '../edad-beneficiario.js';
 import { NivelRegistroEnum } from '../../enums/nivel-registro.enum.js';
 
 export class BeneficiarioModel {
@@ -24,15 +25,12 @@ export class BeneficiarioModel {
   }
 
   static calcularEsMenorEdad(fechaNacimiento: string | Date): boolean {
-    if (!fechaNacimiento) return false;
-    const fecha = new Date(fechaNacimiento);
-    if (isNaN(fecha.getTime())) return false;
-    const hoy = new Date();
-    let edad = hoy.getFullYear() - fecha.getFullYear();
-    const mesDiff = hoy.getMonth() - fecha.getMonth();
-    if (mesDiff < 0 || (mesDiff === 0 && hoy.getDate() < fecha.getDate())) {
-      edad--;
-    }
-    return edad < 18;
+    const fecha =
+      fechaNacimiento instanceof Date
+        ? Number.isFinite(fechaNacimiento.getTime())
+          ? fechaNacimiento.toISOString().slice(0, 10)
+          : ''
+        : fechaNacimiento;
+    return clasificarEdad(fecha) === 'menor';
   }
 }

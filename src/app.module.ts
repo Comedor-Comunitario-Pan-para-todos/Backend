@@ -29,6 +29,9 @@ import { CrearConsentimientos1795368000000 } from './consentimientos/infrastruct
 
 import { GestionarConsentimientoImagen1795454400000 } from './consentimientos/infrastructure/migrations/1795454400000-gestionar-consentimiento-imagen.js';
 
+import { autorizacionTutorSchema } from './consentimientos/infrastructure/autorizacion-tutor.schema.js';
+import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrastructure/migrations/1795540800000-crear-autorizaciones-tutor.js';
+
 @Module({
   imports: [
     // 1. Carga las variables de entorno de .env globalmente
@@ -61,11 +64,13 @@ import { GestionarConsentimientoImagen1795454400000 } from './consentimientos/in
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
           consentimientoBeneficiarioSchema,
+          autorizacionTutorSchema,
         ],
         migrations: [
           CrearCadenaFrio1795305600000,
           CrearConsentimientos1795368000000,
           GestionarConsentimientoImagen1795454400000,
+          CrearAutorizacionesTutor1795540800000,
         ],
         migrationsRun: true,
         synchronize: true, // Sincroniza las entidades automáticamente creando las tablas en MySQL
