@@ -8,6 +8,7 @@ import type { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { GestionarConsentimientoImagen1795454400000 } from '../src/consentimientos/infrastructure/migrations/1795454400000-gestionar-consentimiento-imagen.js';
+import { CrearAutorizacionesTutor1795540800000 } from '../src/consentimientos/infrastructure/migrations/1795540800000-crear-autorizaciones-tutor.js';
 import { AppModule } from '../src/app.module.js';
 import { Beneficiario } from '../src/beneficiarios/entities/beneficiario.entity.js';
 import { consentimientoBeneficiarioSchema } from '../src/consentimientos/infrastructure/consentimiento.schema.js';
@@ -566,14 +567,12 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
         const rol = await db
           .getRepository(Rol)
           .findOneByOrFail({ nombre: RolEnum.COORDINADORA });
-        coord = await db
-          .getRepository(Usuario)
-          .save({
-            email: 'rf21-coord@example.test',
-            nombreCompleto: 'Coordinadora RF21',
-            password: 'fixture',
-            rol,
-          });
+        coord = await db.getRepository(Usuario).save({
+          email: 'rf21-coord@example.test',
+          nombreCompleto: 'Coordinadora RF21',
+          password: 'fixture',
+          rol,
+        });
         authCoord =
           'Bearer ' +
           (await app!
@@ -615,11 +614,11 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
         );
         const runner = db.createQueryRunner();
         try {
-          await db.undoLastMigration();
+          await new CrearAutorizacionesTutor1795540800000().down(runner);
           expect(await runner.hasTable('autorizaciones_tutor')).toBe(false);
         } finally {
           try {
-            await db.runMigrations();
+            await new CrearAutorizacionesTutor1795540800000().up(runner);
             expect(await runner.hasTable('autorizaciones_tutor')).toBe(true);
           } finally {
             await runner.release();
@@ -628,14 +627,12 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
       });
 
       it('exige dos pasos, protege los datos y revoca ambos permisos en la misma operación', async () => {
-        const { id } = await db
-          .getRepository(Beneficiario)
-          .save({
-            ...ficha,
-            nombres: 'RF21 Flujo',
-            fechaNacimiento: '2016-03-01',
-            esMenorEdad: false,
-          });
+        const { id } = await db.getRepository(Beneficiario).save({
+          ...ficha,
+          nombres: 'RF21 Flujo',
+          fechaNacimiento: '2016-03-01',
+          esMenorEdad: false,
+        });
         const ruta = '/beneficiarios/' + id;
         const imagen = { versionPolitica: 1, finalidad: 'USO_IMAGEN' };
         const inicial = await http

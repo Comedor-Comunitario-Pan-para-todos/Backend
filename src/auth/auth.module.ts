@@ -52,6 +52,13 @@ import { JwtStrategy } from './strategies/jwt.strategy.js';
       useClass: JwtTokenAdapter,
     },
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, PassportModule, JwtModule],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    RolesGuard,
+    PassportModule,
+    JwtModule,
+    PASSWORD_HASHER_PORT,
+  ],
 })
 export class AuthModule {}
