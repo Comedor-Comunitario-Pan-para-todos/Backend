@@ -9,6 +9,7 @@ import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { GestionarConsentimientoImagen1795454400000 } from '../src/consentimientos/infrastructure/migrations/1795454400000-gestionar-consentimiento-imagen.js';
 import { CrearAutorizacionesTutor1795540800000 } from '../src/consentimientos/infrastructure/migrations/1795540800000-crear-autorizaciones-tutor.js';
+import { CrearLogExportaciones1795713600000 } from '../src/exportaciones/infrastructure/migrations/1795713600000-crear-log-exportaciones.js';
 import { AppModule } from '../src/app.module.js';
 import { Beneficiario } from '../src/beneficiarios/entities/beneficiario.entity.js';
 import { consentimientoBeneficiarioSchema } from '../src/consentimientos/infrastructure/consentimiento.schema.js';
@@ -378,6 +379,7 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
         } finally {
           try {
             await new GestionarConsentimientoImagen1795454400000().up(runner);
+            await new CrearLogExportaciones1795713600000().up(runner);
             expect(
               await runner.hasColumn(
                 'consentimientos_beneficiarios',

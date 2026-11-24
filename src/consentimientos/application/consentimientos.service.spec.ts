@@ -17,6 +17,7 @@ describe('ConsentimientosService (RF-19)', () => {
     buscarVigentes: vi.fn(),
     buscarImagenesVigentes: vi.fn(),
     revocarImagen: vi.fn(),
+    revocarReporteAlcaldia: vi.fn(),
     historialImagen: vi.fn(),
   });
 
