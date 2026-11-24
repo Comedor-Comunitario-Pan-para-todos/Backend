@@ -38,6 +38,12 @@ import { ReportesModule } from './reportes/reportes.module.js';
 import { AsistenciaDiariaView } from './reportes/infrastructure/asistencia-diaria.view.js';
 import { consultaReporteSchema } from './reportes/infrastructure/consulta-reporte.schema.js';
 import { CrearConsultasReportes1795800000000 } from './reportes/infrastructure/migrations/1795800000000-crear-consultas-reportes.js';
+import { RetencionModule } from './retencion/retencion.module.js';
+import {
+  politicaRetencionSchema,
+  bitacoraRetencionSchema,
+} from './retencion/infrastructure/retencion.schemas.js';
+import { CrearRetencion1795627200000 } from './retencion/infrastructure/migrations/1795627200000-crear-retencion.js';
 
 @Module({
   imports: [
@@ -75,12 +81,15 @@ import { CrearConsultasReportes1795800000000 } from './reportes/infrastructure/m
           autorizacionTutorSchema,
           AsistenciaDiariaView,
           consultaReporteSchema,
+          politicaRetencionSchema,
+          bitacoraRetencionSchema,
         ],
         migrations: [
           CrearCadenaFrio1795305600000,
           CrearConsentimientos1795368000000,
           GestionarConsentimientoImagen1795454400000,
           CrearAutorizacionesTutor1795540800000,
+          CrearRetencion1795627200000,
           CrearConsultasReportes1795800000000,
         ],
         migrationsRun: true,
@@ -100,6 +109,7 @@ import { CrearConsultasReportes1795800000000 } from './reportes/infrastructure/m
     ActasDescartesModule,
     ExcepcionesEntregaModule,
     ReportesModule,
+    RetencionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
