@@ -20,6 +20,8 @@ import { TurnosModule } from './turnos/turnos.module.js';
 import { TurnoAtencion } from './turnos/entities/turno-atencion.entity.js';
 import { DescartesModule } from './descartes/descartes.module.js';
 import { Descarte } from './descartes/infrastructure/adapters/out/persistence/descarte.entity.js';
+import { ActasDescartesModule } from './actas-descarte/actas-descarte.module.js';
+import { ActaDescarte } from './actas-descarte/infrastructure/adapters/out/persistence/acta-descarte.entity.js';
 
 import { ConsentimientosModule } from './consentimientos/consentimientos.module.js';
 import { consentimientoBeneficiarioSchema } from './consentimientos/infrastructure/consentimiento.schema.js';
@@ -52,6 +54,7 @@ import { CrearConsentimientos1795368000000 } from './consentimientos/infrastruct
           Beneficiario,
           TurnoAtencion,
           Descarte,
+          ActaDescarte,
           equipoRefrigeracionSchema,
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
@@ -75,6 +78,7 @@ import { CrearConsentimientos1795368000000 } from './consentimientos/infrastruct
     CadenaFrioModule,
     ConsentimientosModule,
     DescartesModule,
+    ActasDescartesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
