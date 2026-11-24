@@ -133,7 +133,7 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
         consentimientoBeneficiarioSchema,
         { beneficiarioId },
       );
-      expect(evidencia).toEqual({
+      expect(evidencia).toMatchObject({
         ...consentimiento,
         id: expect.any(String),
         beneficiarioId,
@@ -338,14 +338,12 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
       const rol = await db
         .getRepository(Rol)
         .findOneByOrFail({ nombre: RolEnum.COORDINADORA });
-      const coordinadora = await db
-        .getRepository(Usuario)
-        .save({
-          email: 'rf19-coord@example.test',
-          nombreCompleto: 'Coordinadora de prueba',
-          password: 'fixture',
-          rol,
-        });
+      const coordinadora = await db.getRepository(Usuario).save({
+        email: 'rf19-coord@example.test',
+        nombreCompleto: 'Coordinadora de prueba',
+        password: 'fixture',
+        rol,
+      });
       const autorizacion =
         'Bearer ' +
         (await app!
@@ -364,11 +362,200 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
       });
     });
 
-    it('revierte el alta si falla la escritura de evidencia y reaplica la migración', async () => {
+    describe('RF-20', () => {
+      it('revierte y reaplica su migración antes de registrar revocaciones', async () => {
+        const runner = db.createQueryRunner();
+        try {
+          await db.undoLastMigration();
+          expect(
+            await runner.hasColumn(
+              'consentimientos_beneficiarios',
+              'activaImagen',
+            ),
+          ).toBe(false);
+        } finally {
+          try {
+            await db.runMigrations();
+            expect(
+              await runner.hasColumn(
+                'consentimientos_beneficiarios',
+                'activaImagen',
+              ),
+            ).toBe(true);
+          } finally {
+            await runner.release();
+          }
+        }
+      });
+      it('publica alta, revocación, historial y PUT en Swagger', () => {
+        const spec = SwaggerModule.createDocument(
+          app!,
+          new DocumentBuilder().addBearerAuth().build(),
+        );
+        expect(
+          spec.paths['/beneficiarios/{id}/consentimiento'].post?.responses,
+        ).toHaveProperty('409');
+        expect(
+          spec.paths['/beneficiarios/{id}/consentimiento/revocacion'].post
+            ?.responses,
+        ).toHaveProperty('200');
+        expect(
+          spec.paths['/beneficiarios/{id}/consentimientos'].get?.responses,
+        ).toHaveProperty('200');
+        expect(
+          spec.paths['/beneficiarios/{id}/consentimiento-imagen'].put
+            ?.responses,
+        ).toHaveProperty('200');
+      });
+
+      it('bloquea por defecto, mantiene una autorización vigente y conserva la evidencia al revocar y volver a autorizar', async () => {
+        const { id } = await db
+          .getRepository(Beneficiario)
+          .save({ ...ficha, nombres: 'Imagen RF20' });
+        const ruta = '/beneficiarios/' + id;
+        const alta = { versionPolitica: 1, finalidad: 'USO_IMAGEN' };
+        await http
+          .post(ruta + '/consentimiento/revocacion')
+          .set('Authorization', auth)
+          .send({ finalidad: 'USO_IMAGEN' })
+          .expect(404);
+        const previa = await http
+          .get(ruta)
+          .set('Authorization', auth)
+          .expect(200);
+        expect(previa.body.consentimientoImagen).toBeNull();
+        expect(previa.body.consentimiento).toBeNull();
+
+        const respuestas = await Promise.all(
+          [0, 1].map(() =>
+            http
+              .post(ruta + '/consentimiento')
+              .set('Authorization', auth)
+              .send(alta),
+          ),
+        );
+        expect(
+          respuestas.map(({ status }) => status).sort((a, b) => a - b),
+        ).toEqual([200, 201]);
+        const original = respuestas[0].body;
+        expect(original).toEqual(respuestas[1].body);
+        expect(original).toMatchObject({
+          versionPolitica: 1,
+          finalidad: 'USO_IMAGEN',
+          metodo: 'VERBAL_CON_TESTIGO',
+          vigente: true,
+          registradoPor: { id: actor.id, nombreCompleto: actor.nombreCompleto },
+          revocadoPor: null,
+          revocadoEn: null,
+        });
+        const listado = await http
+          .get('/beneficiarios')
+          .query({ search: 'Imagen RF20' })
+          .set('Authorization', auth)
+          .expect(200);
+        expect(listado.body.data[0].consentimientoImagen).toEqual(original);
+
+        const revocado = await http
+          .post(ruta + '/consentimiento/revocacion')
+          .set('Authorization', auth)
+          .send({ finalidad: 'USO_IMAGEN' })
+          .expect(200);
+        expect(revocado.body).toMatchObject({
+          id: original.id,
+          vigente: false,
+          revocadoEn: expect.any(String),
+          revocadoPor: { id: actor.id },
+        });
+        const posterior = await http
+          .get(ruta)
+          .set('Authorization', auth)
+          .expect(200);
+        expect(posterior.body.consentimientoImagen).toBeNull();
+
+        const nueva = await http
+          .put(ruta + '/consentimiento-imagen')
+          .set('Authorization', auth)
+          .send({ autorizado: true, versionPolitica: 1 })
+          .expect(200);
+        expect(nueva.body.id).not.toBe(original.id);
+        const historial = await http
+          .get(ruta + '/consentimientos')
+          .query({ finalidad: 'USO_IMAGEN' })
+          .set('Authorization', auth)
+          .expect(200);
+        expect(historial.body).toEqual([nueva.body, revocado.body]);
+        await http
+          .put(ruta + '/consentimiento-imagen')
+          .set('Authorization', auth)
+          .send({ autorizado: false })
+          .expect(200);
+        expect(
+          (await db.getRepository(Beneficiario).findOneByOrFail({ id }))
+            .autorizaTratamientoDatos,
+        ).toBe(false);
+      });
+
+      it('rechaza los opt-in de menores en ambas rutas y bloquea imágenes si se corrige la edad', async () => {
+        const fechaNacimiento = '2015-05-05';
+        const menor = await db
+          .getRepository(Beneficiario)
+          .save({ ...ficha, fechaNacimiento, esMenorEdad: false });
+        const ruta = '/beneficiarios/' + menor.id;
+        const post = await http
+          .post(ruta + '/consentimiento')
+          .set('Authorization', auth)
+          .send({ versionPolitica: 1, finalidad: 'USO_IMAGEN' })
+          .expect(409);
+        expect(post.body.code).toBe('REQUIERE_TUTOR');
+        await http
+          .put(ruta + '/consentimiento-imagen')
+          .set('Authorization', auth)
+          .send({ autorizado: true, versionPolitica: 1 })
+          .expect(409);
+        await http
+          .get(ruta + '/consentimientos')
+          .query({ finalidad: 'USO_IMAGEN' })
+          .set('Authorization', auth)
+          .expect(200, []);
+
+        const adulto = await db.getRepository(Beneficiario).save({ ...ficha });
+        const detalle = '/beneficiarios/' + adulto.id;
+        await http
+          .put(detalle + '/consentimiento-imagen')
+          .set('Authorization', auth)
+          .send({ autorizado: true, versionPolitica: 1 })
+          .expect(200);
+        const correccion = await http
+          .patch(detalle)
+          .set('Authorization', auth)
+          .send({ fechaNacimiento })
+          .expect(200);
+        expect(correccion.body.consentimientoImagen).toBeNull();
+      });
+
+      it('procesa 150 altas de imagen en menos de 2 segundos por transacción', async () => {
+        for (let i = 0; i < 150; i++) {
+          const { id } = await db
+            .getRepository(Beneficiario)
+            .save({ ...ficha });
+          const inicio = performance.now();
+          await http
+            .put('/beneficiarios/' + id + '/consentimiento-imagen')
+            .set('Authorization', auth)
+            .send({ autorizado: true, versionPolitica: 1 })
+            .expect(200);
+          expect(performance.now() - inicio).toBeLessThan(2000);
+        }
+      }, 30000);
+    });
+
+    it('revierte el alta si falla la escritura de evidencia', async () => {
       const antes = await db.manager.count(Beneficiario);
       const runner = db.createQueryRunner();
       try {
-        await db.undoLastMigration();
+        await runner.query(
+          'RENAME TABLE consentimientos_beneficiarios TO consentimientos_beneficiarios_prueba',
+        );
         expect(await runner.hasTable('consentimientos_beneficiarios')).toBe(
           false,
         );
@@ -385,7 +572,9 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
         expect(await db.manager.count(Beneficiario)).toBe(antes);
       } finally {
         try {
-          await db.runMigrations();
+          await runner.query(
+            'RENAME TABLE consentimientos_beneficiarios_prueba TO consentimientos_beneficiarios',
+          );
           expect(await runner.hasTable('consentimientos_beneficiarios')).toBe(
             true,
           );

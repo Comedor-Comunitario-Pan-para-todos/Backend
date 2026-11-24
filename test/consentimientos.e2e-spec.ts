@@ -48,6 +48,8 @@ describe('Consentimientos (HTTP)', () => {
   const registrar = vi.fn();
   const crear = vi.fn();
   const buscarVigentes = vi.fn();
+  const revocarImagen = vi.fn();
+  const historialImagen = vi.fn();
 
   beforeAll(async () => {
     const modulo = await Test.createTestingModule({
@@ -56,7 +58,13 @@ describe('Consentimientos (HTTP)', () => {
         ConsentimientosService,
         {
           provide: CONSENTIMIENTO_REPOSITORY,
-          useValue: { registrar, buscarVigentes },
+          useValue: {
+            registrar,
+            buscarVigentes,
+            buscarImagenesVigentes: vi.fn().mockResolvedValue([]),
+            revocarImagen,
+            historialImagen,
+          },
         },
         { provide: BeneficiariosService, useValue: { create: crear } },
       ],
@@ -90,14 +98,12 @@ describe('Consentimientos (HTTP)', () => {
 
   beforeEach(() => {
     buscarVigentes.mockReset().mockResolvedValue([]);
-    registrar
-      .mockReset()
-      .mockImplementation((datos: object) =>
-        Promise.resolve({
-          creado: true,
-          consentimiento: { ...datos, registradoPor: operador },
-        }),
-      );
+    registrar.mockReset().mockImplementation((datos: object) =>
+      Promise.resolve({
+        creado: true,
+        consentimiento: { ...datos, registradoPor: operador },
+      }),
+    );
     crear.mockReset().mockResolvedValue({
       id: beneficiarioId,
       nombres: 'Ana',
@@ -236,6 +242,7 @@ describe('Consentimientos (HTTP)', () => {
         id: beneficiarioId,
         nombres: 'Ana',
         consentimiento: null,
+        consentimientoImagen: null,
       });
     expect(crear).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining(alta),
@@ -303,6 +310,68 @@ describe('Consentimientos (HTTP)', () => {
       expect(crear).not.toHaveBeenCalled();
     },
   );
+
+  it('valida el contrato de imagen y atribuye las operaciones al JWT', async () => {
+    const http = request(app.getHttpServer());
+    const detalle = '/beneficiarios/' + beneficiarioId;
+    const put = detalle + '/consentimiento-imagen';
+    const baja = detalle + '/consentimiento/revocacion';
+    const historial = detalle + '/consentimientos';
+    const decision = { finalidad: 'USO_IMAGEN' };
+    revocarImagen.mockReset().mockResolvedValue(decision);
+    historialImagen.mockReset().mockResolvedValue([decision]);
+
+    await http
+      .post(ruta)
+      .set('Authorization', voluntario)
+      .send({ ...decision, versionPolitica: 1 })
+      .expect(201);
+    expect(registrar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        versionTexto: 1,
+        metodo: 'VERBAL_CON_TESTIGO',
+        registradoPorId: usuarioId,
+      }),
+    );
+    for (const payload of [
+      { autorizado: 'true' },
+      { autorizado: true },
+      { autorizado: true, versionPolitica: 1, tutorAutorizo: true },
+      { autorizado: true, versionPolitica: 1, foto: 'archivo' },
+    ]) {
+      await http
+        .put(put)
+        .set('Authorization', voluntario)
+        .send(payload)
+        .expect(400);
+    }
+    await http
+      .put(put)
+      .set('Authorization', RolEnum.DONANTE)
+      .send({ autorizado: false })
+      .expect(403);
+    await http.get(historial).query(decision).expect(401);
+    await http
+      .get(historial)
+      .set('Authorization', voluntario)
+      .query({ finalidad: 'ATENCION_ALIMENTARIA' })
+      .expect(400);
+    await http
+      .get(historial)
+      .set('Authorization', voluntario)
+      .query(decision)
+      .expect(200, [decision]);
+    expect(historialImagen).toHaveBeenCalledExactlyOnceWith(beneficiarioId);
+    await http
+      .post(baja)
+      .set('Authorization', voluntario)
+      .send(decision)
+      .expect(200, decision);
+    expect(revocarImagen).toHaveBeenCalledExactlyOnceWith(
+      beneficiarioId,
+      usuarioId,
+    );
+  });
 
   it('impide alterar el consentimiento a través de PATCH de beneficiarios', async () => {
     await request(app.getHttpServer())

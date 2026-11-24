@@ -38,9 +38,12 @@ import {
   ValidacionDocumentoDto,
 } from './dto/beneficiario-respuesta.dto.js';
 
+import { ConsentimientoImagenDto } from '../consentimientos/dto/consentimiento-imagen.dto.js';
+import { requiereTutorParaImagen } from '../consentimientos/domain/consentimiento-imagen.js';
+
 type SolicitudBeneficiario = { user: { rol: { nombre: RolEnum } } };
 
-@ApiExtraModels(ConsentimientoRegistradoDto)
+@ApiExtraModels(ConsentimientoRegistradoDto, ConsentimientoImagenDto)
 @ApiTags('Gestión de beneficiarios (Padrón)')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -115,8 +118,13 @@ export class BeneficiariosController {
     @Req() { user }: SolicitudBeneficiario,
   ) {
     const { data, meta } = await this.beneficiariosService.findAll(query);
-    const vigentes = await this.consentimientos.buscarVigentes(
-      data.map(({ id }) => id),
+    const ids = data.map(({ id }) => id);
+    const [vigentes, imagenes] = await Promise.all([
+      this.consentimientos.buscarVigentes(ids),
+      this.consentimientos.buscarImagenesVigentes(ids),
+    ]);
+    const imagenPorBeneficiario = new Map(
+      imagenes.map((imagen) => [imagen.beneficiarioId, imagen]),
     );
     const porBeneficiario = new Map(
       vigentes.map((evidencia) => [evidencia.beneficiarioId, evidencia]),
@@ -127,6 +135,7 @@ export class BeneficiariosController {
           ficha,
           user.rol.nombre,
           porBeneficiario.get(ficha.id) ?? null,
+          imagenPorBeneficiario.get(ficha.id) ?? null,
         ),
       ),
       meta,
@@ -200,16 +209,24 @@ export class BeneficiariosController {
   }
 
   private async presentarFicha(beneficiario: Beneficiario, rol: RolEnum) {
-    const [consentimiento] = await this.consentimientos.buscarVigentes([
-      beneficiario.id,
+    const ids = [beneficiario.id];
+    const [[consentimiento], [imagen]] = await Promise.all([
+      this.consentimientos.buscarVigentes(ids),
+      this.consentimientos.buscarImagenesVigentes(ids),
     ]);
-    return this.proyectar(beneficiario, rol, consentimiento ?? null);
+    return this.proyectar(
+      beneficiario,
+      rol,
+      consentimiento ?? null,
+      imagen ?? null,
+    );
   }
 
   private proyectar(
     beneficiario: Beneficiario,
     rol: RolEnum,
     consentimiento: ConsentimientoConOperador | null,
+    imagen: ConsentimientoConOperador | null,
   ) {
     const {
       tipoDocumento,
@@ -229,6 +246,10 @@ export class BeneficiariosController {
           }
         : {}),
       consentimiento,
+      consentimientoImagen:
+        imagen && !requiereTutorParaImagen(beneficiario.fechaNacimiento)
+          ? imagen
+          : null,
     };
   }
 

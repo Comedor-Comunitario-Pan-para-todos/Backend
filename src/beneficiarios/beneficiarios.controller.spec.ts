@@ -23,6 +23,7 @@ describe('BeneficiariosController (RF-01, RF-02)', () => {
     service = mockService as any;
     controller = new BeneficiariosController(service, {
       buscarVigentes: vi.fn().mockResolvedValue([]),
+      buscarImagenesVigentes: vi.fn().mockResolvedValue([]),
     } as unknown as ConsentimientosService);
   });
 
