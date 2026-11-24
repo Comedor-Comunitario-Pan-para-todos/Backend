@@ -34,6 +34,11 @@ import { GestionarConsentimientoImagen1795454400000 } from './consentimientos/in
 import { autorizacionTutorSchema } from './consentimientos/infrastructure/autorizacion-tutor.schema.js';
 import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrastructure/migrations/1795540800000-crear-autorizaciones-tutor.js';
 
+import { ReportesModule } from './reportes/reportes.module.js';
+import { AsistenciaDiariaView } from './reportes/infrastructure/asistencia-diaria.view.js';
+import { consultaReporteSchema } from './reportes/infrastructure/consulta-reporte.schema.js';
+import { CrearConsultasReportes1795800000000 } from './reportes/infrastructure/migrations/1795800000000-crear-consultas-reportes.js';
+
 @Module({
   imports: [
     // 1. Carga las variables de entorno de .env globalmente
@@ -68,12 +73,15 @@ import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrast
           accesoCatalogoSchema,
           consentimientoBeneficiarioSchema,
           autorizacionTutorSchema,
+          AsistenciaDiariaView,
+          consultaReporteSchema,
         ],
         migrations: [
           CrearCadenaFrio1795305600000,
           CrearConsentimientos1795368000000,
           GestionarConsentimientoImagen1795454400000,
           CrearAutorizacionesTutor1795540800000,
+          CrearConsultasReportes1795800000000,
         ],
         migrationsRun: true,
         synchronize: true, // Sincroniza las entidades automáticamente creando las tablas en MySQL
@@ -91,6 +99,7 @@ import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrast
     DescartesModule,
     ActasDescartesModule,
     ExcepcionesEntregaModule,
+    ReportesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

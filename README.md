@@ -359,3 +359,29 @@ El contrato está en `/api/docs` y los casos de integración se ejecutan con
 revertir antes de guardar autorizaciones de tutor; luego se detiene para
 preservar la evidencia y evitar que el esquema previo interprete un permiso
 del tutor como un permiso del adulto.
+
+## RF-16 · Reporte de gestión para la JAC
+
+`GET /reportes/gestion?periodo=2026-11` requiere JWT de `COORDINADORA`
+o `PRESIDENTE_JAC`. El parámetro `periodo` es obligatorio y tiene formato
+`AAAA-MM`. Una solicitud inválida responde `400`, sin sesión `401` y con
+otro rol `403`. La respuesta es JSON con `Cache-Control: no-store`.
+
+| Campo | Contenido |
+|---|---|
+| `periodo` | Mes consultado. |
+| `turnosEmitidos`, `turnosAtendidos` | Conteos del mes. Atendidos cuenta solo el estado `ATENDIDO`. |
+| `diasAtencion` | Días con al menos un turno atendido. |
+| `asistenciaDiaria` | Serie con `fecha`, `turnosEmitidos` y `turnosAtendidos`, ordenada por fecha. |
+| `descartesRegistrados`, `descartesPorUnidad` | Total de descartes y grupos `{ unidadMedida, cantidad }`. La suma usa solo `KG`, `G`, `L`, `ML` y `UNIDAD`. |
+| `actasAutorizadas` | Conteo por fecha de autorización. |
+| `fotos` | Arreglo vacío hasta contar con una fuente que verifique las panorámicas antes de publicarlas. Las referencias de las actas quedan fuera de la galería. |
+
+Los cortes horarios de descartes y actas corresponden a Colombia. En meses
+sin actividad se devuelven ceros y arreglos vacíos. Cada consulta exitosa
+registra por separado el operador, el mes y la fecha de consulta. El reporte
+excluye datos de beneficiarios, productos, donantes y texto libre.
+
+El contrato está en Swagger en `/api/docs`. La prueba HTTP se ejecuta con
+`npm run test:e2e -- reportes.e2e-spec.ts`. La suite MariaDB usa una base
+local temporal y se habilita con `RF16_MYSQL_E2E=1`.
