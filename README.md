@@ -359,3 +359,29 @@ El contrato está en `/api/docs` y los casos de integración se ejecutan con
 revertir antes de guardar autorizaciones de tutor; luego se detiene para
 preservar la evidencia y evitar que el esquema previo interprete un permiso
 del tutor como un permiso del adulto.
+
+## RF-22 · Política de retención
+
+Solo la Coordinadora autenticada puede consultar o cambiar la política.
+Swagger publica el contrato en `/api/docs`.
+
+| Operación | Contrato |
+|---|---|
+| `GET /retencion` | `200` con `{ politica, historial }`. Antes de configurar, `politica` es `null`. El historial contiene los últimos 100 cambios y verificaciones. |
+| `PUT /retencion` | JSON `{ "diasBasicos": 730, "diasSensibles": 365, "password": "contraseña actual" }`. Responde `200` con ambos plazos y `actualizadaPorId`, `actualizadaEn`. Los plazos son enteros independientes de 1 a 36500. Campos inválidos generan `400`; credenciales sin confirmar, `403`. |
+
+Los días son periodos de 24 horas desde la última actividad registrada de la
+ficha, su desactivación, turnos, excepciones de entrega, consentimientos o
+autorizaciones del tutor. Los datos sensibles evaluados son documento,
+teléfono y clasificación socioeconómica. Las consultas y cambios quedan
+auditados. La contraseña se comprueba contra el hash del operador y nunca
+se guarda en la bitácora ni se devuelve.
+
+El job verifica al primer minuto del arranque y luego cada 24 horas. Si no
+hay política configurada, no hace nada. La tabla de verificación mantiene
+solo las marcas vigentes y la bitácora muestra sus totales. Un cambio de
+política invalida las marcas previas. RF-22 deja los expedientes pendientes
+de verificación, sin ejecutar eliminación ni anonimización automática.
+
+La migración es reversible antes de escribir bitácora. La suite con MariaDB
+usa una base local temporal y se habilita con `RF22_MYSQL_E2E=1`.
