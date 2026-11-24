@@ -125,6 +125,10 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
         .send({ ...ficha, autorizaTratamientoDatos: true, consentimiento })
         .expect(201);
       const beneficiarioId = body.id as string;
+      expect(body.consentimiento).toMatchObject({
+        beneficiarioId,
+        registradoPor: { id: actor.id, nombreCompleto: actor.nombreCompleto },
+      });
       const evidencia = await db.manager.findOneByOrFail(
         consentimientoBeneficiarioSchema,
         { beneficiarioId },
@@ -233,6 +237,132 @@ describe.skipIf(process.env.RF19_MYSQL_E2E !== '1')(
         antes + 150,
       );
     }, 30000);
+
+    it('mantiene separadas las finalidades y proyecta la ficha con el consentimiento alimentario vigente', async () => {
+      const numeroDocumento = 'RF19REVISION';
+      const registro = await db.getRepository(Beneficiario).save({
+        ...ficha,
+        nombres: 'Ficha de revisión',
+        tipoDocumento: 'CC',
+        numeroDocumento,
+        telefono: '3001234567',
+        clasificacionSocioeconomica: 'C1',
+        autorizaTratamientoDatos: false,
+      });
+      const detalle = '/beneficiarios/' + registro.id;
+      const ruta = detalle + '/consentimiento';
+      const imagen = {
+        ...consentimiento,
+        finalidad: 'USO_IMAGEN',
+        versionTexto: 3,
+      };
+      const operador = { id: actor.id, nombreCompleto: actor.nombreCompleto };
+      const resImagen = await http
+        .post(ruta)
+        .set('Authorization', auth)
+        .send(imagen)
+        .expect(201);
+      expect(resImagen.body.registradoPor).toEqual(operador);
+      await http
+        .post(ruta)
+        .set('Authorization', auth)
+        .send(imagen)
+        .expect(200, resImagen.body);
+
+      const pendiente = await http
+        .get(detalle)
+        .set('Authorization', auth)
+        .expect(200);
+      expect(pendiente.body).toMatchObject({
+        consentimiento: null,
+        autorizaTratamientoDatos: false,
+      });
+
+      const original = await http
+        .post(ruta)
+        .set('Authorization', auth)
+        .send({ ...consentimiento, versionTexto: 3 })
+        .expect(201);
+      expect(original.body.registradoPor).toEqual(operador);
+      const actual = await http
+        .post(ruta)
+        .set('Authorization', auth)
+        .send({ ...consentimiento, versionTexto: 4 })
+        .expect(201);
+      await http
+        .post(ruta)
+        .set('Authorization', auth)
+        .send(consentimiento)
+        .expect(201);
+
+      const fichaDetalle = await http
+        .get(detalle)
+        .set('Authorization', auth)
+        .expect(200);
+      const listado = await http
+        .get('/beneficiarios')
+        .query({ search: numeroDocumento })
+        .set('Authorization', auth)
+        .expect(200);
+      const actualizado = await http
+        .patch(detalle)
+        .set('Authorization', auth)
+        .send({ barrio: 'Centro' })
+        .expect(200);
+      const validacion = await http
+        .get('/beneficiarios/validar-documento/' + numeroDocumento)
+        .set('Authorization', auth)
+        .expect(200);
+
+      for (const respuesta of [
+        fichaDetalle.body,
+        listado.body.data[0],
+        actualizado.body,
+        validacion.body.beneficiario,
+      ]) {
+        expect(respuesta).toMatchObject({
+          id: registro.id,
+          consentimiento: actual.body,
+          autorizaTratamientoDatos: true,
+        });
+        for (const campo of [
+          'tipoDocumento',
+          'numeroDocumento',
+          'telefono',
+          'clasificacionSocioeconomica',
+        ]) {
+          expect(respuesta).not.toHaveProperty(campo);
+        }
+      }
+
+      const rol = await db
+        .getRepository(Rol)
+        .findOneByOrFail({ nombre: RolEnum.COORDINADORA });
+      const coordinadora = await db
+        .getRepository(Usuario)
+        .save({
+          email: 'rf19-coord@example.test',
+          nombreCompleto: 'Coordinadora de prueba',
+          password: 'fixture',
+          rol,
+        });
+      const autorizacion =
+        'Bearer ' +
+        (await app!
+          .get(JwtService)
+          .signAsync({ sub: coordinadora.id, email: coordinadora.email }));
+      const fichaCompleta = await http
+        .get(detalle)
+        .set('Authorization', autorizacion)
+        .expect(200);
+      expect(fichaCompleta.body).toMatchObject({
+        tipoDocumento: 'CC',
+        numeroDocumento,
+        telefono: '3001234567',
+        clasificacionSocioeconomica: 'C1',
+        consentimiento: actual.body,
+      });
+    });
 
     it('revierte el alta si falla la escritura de evidencia y reaplica la migración', async () => {
       const antes = await db.manager.count(Beneficiario);

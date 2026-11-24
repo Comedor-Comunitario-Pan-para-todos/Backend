@@ -8,8 +8,10 @@ import { BENEFICIARIO_REPOSITORY_PORT } from './domain/ports/beneficiario-reposi
 import { Beneficiario } from './entities/beneficiario.entity.js';
 import { BeneficiarioTypeOrmAdapter } from './infrastructure/adapters/out/persistence/beneficiario-typeorm.adapter.js';
 
+import { ConsentimientosModule } from '../consentimientos/consentimientos.module.js';
+
 @Module({
-  imports: [TypeOrmModule.forFeature([Beneficiario])],
+  imports: [TypeOrmModule.forFeature([Beneficiario]), ConsentimientosModule],
   controllers: [BeneficiariosController],
   providers: [
     BeneficiariosService,

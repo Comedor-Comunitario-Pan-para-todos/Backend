@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ConsentimientosService } from '../consentimientos/application/consentimientos.service.js';
 import { BeneficiariosController } from './beneficiarios.controller.js';
 import { BeneficiariosService } from './beneficiarios.service.js';
 import { NivelRegistroEnum } from './enums/nivel-registro.enum.js';
@@ -20,7 +21,9 @@ describe('BeneficiariosController (RF-01, RF-02)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = mockService as any;
-    controller = new BeneficiariosController(service);
+    controller = new BeneficiariosController(service, {
+      buscarVigentes: vi.fn().mockResolvedValue([]),
+    } as unknown as ConsentimientosService);
   });
 
   it('debe registrar un beneficiario invocando al servicio', async () => {
@@ -33,7 +36,9 @@ describe('BeneficiariosController (RF-01, RF-02)', () => {
     };
     mockService.create.mockResolvedValue({ id: 'uuid-1', ...dto });
 
-    const res = await controller.create(dto as any, { user: { id: 'operador', rol: { nombre: RolEnum.COORDINADORA } } });
+    const res = await controller.create(dto as any, {
+      user: { id: 'operador', rol: { nombre: RolEnum.COORDINADORA } },
+    });
     expect(res).toBeDefined();
     expect(mockService.create).toHaveBeenCalledWith(dto, 'operador');
   });
@@ -47,7 +52,10 @@ describe('BeneficiariosController (RF-01, RF-02)', () => {
         clasificacionSocioeconomica: 'A1',
       },
     ];
-    mockService.findAll.mockResolvedValue({ data, meta: { total: 1, page: 1, limit: 10, totalPages: 1 } });
+    mockService.findAll.mockResolvedValue({
+      data,
+      meta: { total: 1, page: 1, limit: 10, totalPages: 1 },
+    });
 
     // Cuando el rol es COORDINADORA, ve el Sisbén
     const reqCoord = { user: { rol: { nombre: RolEnum.COORDINADORA } } };

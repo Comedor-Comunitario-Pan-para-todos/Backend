@@ -41,30 +41,33 @@ const alta = {
   consentimiento,
 };
 const voluntario = RolEnum.VOLUNTARIO;
+const operador = { id: usuarioId, nombreCompleto: 'Voluntario de Prueba' };
 
 describe('Consentimientos (HTTP)', () => {
   let app: INestApplication<App>;
   const registrar = vi.fn();
   const crear = vi.fn();
+  const buscarVigentes = vi.fn();
 
   beforeAll(async () => {
     const modulo = await Test.createTestingModule({
       controllers: [ConsentimientosController, BeneficiariosController],
       providers: [
         ConsentimientosService,
-        { provide: CONSENTIMIENTO_REPOSITORY, useValue: { registrar } },
+        {
+          provide: CONSENTIMIENTO_REPOSITORY,
+          useValue: { registrar, buscarVigentes },
+        },
         { provide: BeneficiariosService, useValue: { create: crear } },
       ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate(context: ExecutionContext) {
-          const req = context
-            .switchToHttp()
-            .getRequest<{
-              headers: { authorization?: string };
-              user?: unknown;
-            }>();
+          const req = context.switchToHttp().getRequest<{
+            headers: { authorization?: string };
+            user?: unknown;
+          }>();
           if (!req.headers.authorization) throw new UnauthorizedException();
           req.user = {
             id: usuarioId,
@@ -86,20 +89,22 @@ describe('Consentimientos (HTTP)', () => {
   });
 
   beforeEach(() => {
+    buscarVigentes.mockReset().mockResolvedValue([]);
     registrar
       .mockReset()
-      .mockImplementation((datos: unknown) =>
-        Promise.resolve({ creado: true, consentimiento: datos }),
+      .mockImplementation((datos: object) =>
+        Promise.resolve({
+          creado: true,
+          consentimiento: { ...datos, registradoPor: operador },
+        }),
       );
-    crear
-      .mockReset()
-      .mockResolvedValue({
-        id: beneficiarioId,
-        nombres: 'Ana',
-        numeroDocumento: '123',
-        tipoDocumento: 'CC',
-        clasificacionSocioeconomica: 'A1',
-      });
+    crear.mockReset().mockResolvedValue({
+      id: beneficiarioId,
+      nombres: 'Ana',
+      numeroDocumento: '123',
+      tipoDocumento: 'CC',
+      clasificacionSocioeconomica: 'A1',
+    });
   });
 
   afterAll(async () => app?.close());
@@ -125,6 +130,7 @@ describe('Consentimientos (HTTP)', () => {
         id: expect.any(String),
         beneficiarioId,
         registradoPorId: usuarioId,
+        registradoPor: operador,
         registradoEn: expect.any(String),
       });
       expect(registrar).toHaveBeenCalledTimes(1);
@@ -140,7 +146,7 @@ describe('Consentimientos (HTTP)', () => {
     { versionTexto: 1.5 },
     { versionTexto: 2147483648 },
     { finalidad: '' },
-    { finalidad: 'USO_IMAGEN' },
+    { finalidad: 'REPORTE_ALCALDIA' },
     { metodo: 'OTRO' },
     { metodo: undefined },
     { registradoPorId: 'otro' },
@@ -179,6 +185,7 @@ describe('Consentimientos (HTTP)', () => {
       id: beneficiarioId,
       beneficiarioId,
       registradoPorId: usuarioId,
+      registradoPor: operador,
       registradoEn: '2026-11-22T12:00:00.000Z',
     };
     registrar.mockResolvedValue({ creado: false, consentimiento: original });
@@ -207,6 +214,7 @@ describe('Consentimientos (HTTP)', () => {
   it.each([
     { consentimiento: undefined },
     { consentimiento: [] },
+    { consentimiento: { ...consentimiento, finalidad: 'USO_IMAGEN' } },
     { consentimiento: { ...consentimiento, aceptado: false } },
     { consentimiento: { ...consentimiento, registradoPorId: 'otro' } },
     { autorizaTratamientoDatos: false },
@@ -224,12 +232,77 @@ describe('Consentimientos (HTTP)', () => {
       .post('/beneficiarios')
       .set('Authorization', voluntario)
       .send(alta)
-      .expect(201, { id: beneficiarioId, nombres: 'Ana' });
+      .expect(201, {
+        id: beneficiarioId,
+        nombres: 'Ana',
+        consentimiento: null,
+      });
     expect(crear).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining(alta),
       usuarioId,
     );
   });
+
+  it('acepta el uso de imagen en la ruta de consentimiento', async () => {
+    await request(app.getHttpServer())
+      .post(ruta)
+      .set('Authorization', voluntario)
+      .send({ ...consentimiento, finalidad: 'USO_IMAGEN' })
+      .expect(201);
+    expect(registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ finalidad: 'USO_IMAGEN' }),
+    );
+  });
+
+  it('normaliza nivel y clasificación estructurada para el alta', async () => {
+    await request(app.getHttpServer())
+      .post('/beneficiarios')
+      .set('Authorization', voluntario)
+      .send({
+        ...alta,
+        nivel: 'EXTENDIDO',
+        clasificacion: { sistema: 'sisben', grupo: ' c1 ' },
+      })
+      .expect(201);
+    expect(crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nivelRegistro: 'EXTENDIDO',
+        clasificacionSocioeconomica: 'C1',
+      }),
+      usuarioId,
+    );
+  });
+
+  it('acepta RUI sin grupo y lo guarda como RUI', async () => {
+    await request(app.getHttpServer())
+      .post('/beneficiarios')
+      .set('Authorization', voluntario)
+      .send({ ...alta, nivel: 'EXTENDIDO', clasificacion: { sistema: 'RUI' } })
+      .expect(201);
+    expect(crear).toHaveBeenCalledWith(
+      expect.objectContaining({ clasificacionSocioeconomica: 'RUI' }),
+      usuarioId,
+    );
+  });
+
+  it.each([
+    { nivel: 'EXTENDIDO', nivelRegistro: 'BASICO' },
+    { clasificacion: { sistema: 'SISBEN' } },
+    {
+      clasificacion: { sistema: 'SISBEN', grupo: 'C1' },
+      clasificacionSocioeconomica: 'D1',
+    },
+  ])(
+    'rechaza variantes contradictorias o incompletas del alta %j',
+    async (datos) => {
+      await request(app.getHttpServer())
+        .post('/beneficiarios')
+        .set('Authorization', voluntario)
+        .send({ ...alta, ...datos })
+        .expect(400);
+      expect(crear).not.toHaveBeenCalled();
+    },
+  );
 
   it('impide alterar el consentimiento a través de PATCH de beneficiarios', async () => {
     await request(app.getHttpServer())

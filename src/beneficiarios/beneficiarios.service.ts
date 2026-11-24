@@ -17,6 +17,8 @@ import { BeneficiarioModel } from './domain/models/beneficiario.model.js';
 import { prepararConsentimiento } from '../consentimientos/application/consentimientos.service.js';
 import { consentimientoBeneficiarioSchema } from '../consentimientos/infrastructure/consentimiento.schema.js';
 
+import { FINALIDAD_CONSENTIMIENTO } from '../consentimientos/domain/consentimiento.js';
+
 @Injectable()
 export class BeneficiariosService {
   constructor(
@@ -30,6 +32,9 @@ export class BeneficiariosService {
       throw new BadRequestException('Se requiere la autorización explícita de datos');
     }
     const consentimiento = prepararConsentimiento(dto.consentimiento, usuarioId);
+    if (consentimiento.finalidad !== FINALIDAD_CONSENTIMIENTO) {
+      throw new BadRequestException('El alta requiere consentimiento para atención alimentaria');
+    }
     const nivelRegistro = dto.nivelRegistro || NivelRegistroEnum.BASICO;
 
     // Validación condicional del formulario extendido (RF-02 / HU-13 Criterio 3)

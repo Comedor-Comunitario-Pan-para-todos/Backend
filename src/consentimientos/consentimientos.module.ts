@@ -7,6 +7,7 @@ import { ConsentimientoTypeOrmAdapter } from './infrastructure/consentimiento-ty
 
 @Module({
   imports: [AuthModule],
+  exports: [ConsentimientosService],
   controllers: [ConsentimientosController],
   providers: [
     ConsentimientosService,

@@ -5,11 +5,18 @@ export enum MetodoConsentimiento {
 }
 
 export const FINALIDAD_CONSENTIMIENTO = 'ATENCION_ALIMENTARIA';
+export const FINALIDAD_USO_IMAGEN = 'USO_IMAGEN';
+export const FINALIDADES_CONSENTIMIENTO = [
+  FINALIDAD_CONSENTIMIENTO,
+  FINALIDAD_USO_IMAGEN,
+] as const;
+export type FinalidadConsentimiento =
+  (typeof FINALIDADES_CONSENTIMIENTO)[number];
 
 export interface AceptacionConsentimiento {
   aceptado: boolean;
   versionTexto: number;
-  finalidad: typeof FINALIDAD_CONSENTIMIENTO;
+  finalidad: FinalidadConsentimiento;
   metodo: MetodoConsentimiento;
 }
 
@@ -18,7 +25,7 @@ export interface ConsentimientoBeneficiario {
   beneficiarioId: string;
   aceptado: true;
   versionTexto: number;
-  finalidad: typeof FINALIDAD_CONSENTIMIENTO;
+  finalidad: FinalidadConsentimiento;
   metodo: MetodoConsentimiento;
   registradoPorId: string;
   registradoEn: Date;
