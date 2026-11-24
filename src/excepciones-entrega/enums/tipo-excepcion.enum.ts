@@ -1,0 +1,5 @@
+export enum TipoExcepcionEnum {
+  RACION_EXTRA = 'RACION_EXTRA',
+  MERCADO_LLEVAR = 'MERCADO_LLEVAR',
+  DIETA_ESPECIAL = 'DIETA_ESPECIAL',
+}
