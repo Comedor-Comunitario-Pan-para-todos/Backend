@@ -8,6 +8,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { CrearRetencion1795627200000 } from '../src/retencion/infrastructure/migrations/1795627200000-crear-retencion.js';
 import { AppModule } from '../src/app.module.js';
 import { Beneficiario } from '../src/beneficiarios/entities/beneficiario.entity.js';
 import { RetencionService } from '../src/retencion/application/retencion.service.js';
@@ -61,14 +62,12 @@ describe.skipIf(process.env.RF22_MYSQL_E2E !== '1')(
       const rol = await db
         .getRepository(Rol)
         .findOneByOrFail({ nombre: RolEnum.COORDINADORA });
-      operador = await db
-        .getRepository(Usuario)
-        .save({
-          email: 'rf22@example.test',
-          nombreCompleto: 'Coordinadora RF22',
-          password: await hash(password, 10),
-          rol,
-        });
+      operador = await db.getRepository(Usuario).save({
+        email: 'rf22@example.test',
+        nombreCompleto: 'Coordinadora RF22',
+        password: await hash(password, 10),
+        rol,
+      });
       auth =
         'Bearer ' +
         (await app
@@ -105,9 +104,9 @@ describe.skipIf(process.env.RF22_MYSQL_E2E !== '1')(
       });
       const runner = db.createQueryRunner();
       try {
-        await db.undoLastMigration();
+        await new CrearRetencion1795627200000().down(runner);
         expect(await runner.hasTable('politica_retencion')).toBe(false);
-        await db.runMigrations();
+        await new CrearRetencion1795627200000().up(runner);
         expect(await runner.hasTable('retencion_pendiente_verificacion')).toBe(
           true,
         );

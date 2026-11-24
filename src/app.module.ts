@@ -34,6 +34,10 @@ import { GestionarConsentimientoImagen1795454400000 } from './consentimientos/in
 import { autorizacionTutorSchema } from './consentimientos/infrastructure/autorizacion-tutor.schema.js';
 import { CrearAutorizacionesTutor1795540800000 } from './consentimientos/infrastructure/migrations/1795540800000-crear-autorizaciones-tutor.js';
 
+import { ReportesModule } from './reportes/reportes.module.js';
+import { AsistenciaDiariaView } from './reportes/infrastructure/asistencia-diaria.view.js';
+import { consultaReporteSchema } from './reportes/infrastructure/consulta-reporte.schema.js';
+import { CrearConsultasReportes1795800000000 } from './reportes/infrastructure/migrations/1795800000000-crear-consultas-reportes.js';
 import { RetencionModule } from './retencion/retencion.module.js';
 import {
   politicaRetencionSchema,
@@ -75,6 +79,8 @@ import { CrearRetencion1795627200000 } from './retencion/infrastructure/migratio
           accesoCatalogoSchema,
           consentimientoBeneficiarioSchema,
           autorizacionTutorSchema,
+          AsistenciaDiariaView,
+          consultaReporteSchema,
           politicaRetencionSchema,
           bitacoraRetencionSchema,
         ],
@@ -84,6 +90,7 @@ import { CrearRetencion1795627200000 } from './retencion/infrastructure/migratio
           GestionarConsentimientoImagen1795454400000,
           CrearAutorizacionesTutor1795540800000,
           CrearRetencion1795627200000,
+          CrearConsultasReportes1795800000000,
         ],
         migrationsRun: true,
         synchronize: true, // Sincroniza las entidades automáticamente creando las tablas en MySQL
@@ -101,6 +108,7 @@ import { CrearRetencion1795627200000 } from './retencion/infrastructure/migratio
     DescartesModule,
     ActasDescartesModule,
     ExcepcionesEntregaModule,
+    ReportesModule,
     RetencionModule,
   ],
   controllers: [AppController],
