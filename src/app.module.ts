@@ -24,6 +24,8 @@ import { ActasDescartesModule } from './actas-descarte/actas-descarte.module.js'
 import { ActaDescarte } from './actas-descarte/infrastructure/adapters/out/persistence/acta-descarte.entity.js';
 import { ExcepcionesEntregaModule } from './excepciones-entrega/excepciones-entrega.module.js';
 import { ExcepcionEntrega } from './excepciones-entrega/entities/excepcion-entrega.entity.js';
+import { InventarioModule } from './inventario/inventario.module.js';
+import { LoteInventarioEntity } from './inventario/infrastructure/adapters/out/persistence/lote-inventario.entity.js';
 
 import { ConsentimientosModule } from './consentimientos/consentimientos.module.js';
 import { consentimientoBeneficiarioSchema } from './consentimientos/infrastructure/consentimiento.schema.js';
@@ -70,6 +72,7 @@ import { CrearRetencion1795627200000 } from './retencion/infrastructure/migratio
           Descarte,
           ActaDescarte,
           ExcepcionEntrega,
+          LoteInventarioEntity,
           equipoRefrigeracionSchema,
           incidenteCadenaFrioSchema,
           accesoCatalogoSchema,
@@ -102,6 +105,7 @@ import { CrearRetencion1795627200000 } from './retencion/infrastructure/migratio
     ActasDescartesModule,
     ExcepcionesEntregaModule,
     RetencionModule,
+    InventarioModule,
   ],
   controllers: [AppController],
   providers: [AppService],
